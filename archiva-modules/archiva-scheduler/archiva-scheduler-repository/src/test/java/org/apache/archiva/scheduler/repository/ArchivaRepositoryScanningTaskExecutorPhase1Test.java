@@ -19,7 +19,6 @@ package org.apache.archiva.scheduler.repository;
  * under the License.
  */
 
-import org.apache.archiva.model.ArtifactReference;
 import org.apache.archiva.scheduler.repository.model.RepositoryTask;
 import org.junit.Test;
 import org.springframework.test.context.ContextConfiguration;
@@ -47,7 +46,7 @@ public class ArchivaRepositoryScanningTaskExecutorPhase1Test
 
         taskExecutor.executeTask( repoTask );
 
-        Collection<ArtifactReference> unprocessedResultList = testConsumer.getConsumed();
+        Collection<String> unprocessedResultList = testConsumer.getConsumed();
 
         assertNotNull( unprocessedResultList );
         assertEquals( "Incorrect number of unprocessed artifacts detected.", 8, unprocessedResultList.size() );

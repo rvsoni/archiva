@@ -27,7 +27,6 @@ import org.apache.archiva.checksum.ChecksumUtil;
 import org.apache.archiva.checksum.StreamingChecksum;
 import org.apache.archiva.common.filelock.DefaultFileLockManager;
 import org.apache.archiva.common.filelock.FileLockManager;
-import org.apache.archiva.common.plexusbridge.PlexusSisuBridgeException;
 import org.apache.archiva.common.utils.PathUtil;
 import org.apache.archiva.common.utils.VersionUtil;
 import org.apache.archiva.configuration.ArchivaConfiguration;
@@ -35,17 +34,16 @@ import org.apache.archiva.indexer.ArchivaIndexingContext;
 import org.apache.archiva.indexer.merger.IndexMerger;
 import org.apache.archiva.indexer.merger.IndexMergerException;
 import org.apache.archiva.indexer.merger.IndexMergerRequest;
+import org.apache.archiva.indexer.merger.TemporaryGroupIndex;
 import org.apache.archiva.indexer.merger.base.MergedRemoteIndexesTask;
 import org.apache.archiva.indexer.merger.base.MergedRemoteIndexesTaskRequest;
-import org.apache.archiva.indexer.merger.TemporaryGroupIndex;
 import org.apache.archiva.indexer.search.RepositorySearch;
 import org.apache.archiva.indexer.search.RepositorySearchException;
-import org.apache.archiva.maven2.metadata.MavenMetadataReader;
+import org.apache.archiva.metadata.audit.AuditListener;
 import org.apache.archiva.metadata.model.facets.AuditEvent;
 import org.apache.archiva.metadata.repository.storage.RelocationException;
 import org.apache.archiva.metadata.repository.storage.RepositoryStorage;
 import org.apache.archiva.model.ArchivaRepositoryMetadata;
-import org.apache.archiva.model.ArtifactReference;
 import org.apache.archiva.policies.ProxyDownloadException;
 import org.apache.archiva.proxy.ProxyRegistry;
 import org.apache.archiva.proxy.model.RepositoryProxyHandler;
@@ -59,21 +57,25 @@ import org.apache.archiva.redback.policy.MustChangePasswordException;
 import org.apache.archiva.redback.system.SecuritySession;
 import org.apache.archiva.redback.users.User;
 import org.apache.archiva.redback.users.UserManager;
-import org.apache.archiva.repository.LayoutException;
+import org.apache.archiva.repository.content.BaseRepositoryContentLayout;
+import org.apache.archiva.repository.content.ContentAccessException;
+import org.apache.archiva.repository.content.LayoutException;
 import org.apache.archiva.repository.ManagedRepository;
 import org.apache.archiva.repository.ManagedRepositoryContent;
 import org.apache.archiva.repository.ReleaseScheme;
 import org.apache.archiva.repository.RepositoryGroup;
 import org.apache.archiva.repository.RepositoryRegistry;
 import org.apache.archiva.repository.RepositoryRequestInfo;
-import org.apache.archiva.repository.storage.FilesystemStorage;
-import org.apache.archiva.repository.storage.StorageAsset;
-import org.apache.archiva.metadata.audit.AuditListener;
+import org.apache.archiva.repository.content.Artifact;
+import org.apache.archiva.repository.content.ContentItem;
+import org.apache.archiva.repository.content.ItemSelector;
 import org.apache.archiva.repository.features.IndexCreationFeature;
-import org.apache.archiva.repository.metadata.base.MetadataTools;
 import org.apache.archiva.repository.metadata.RepositoryMetadataException;
+import org.apache.archiva.repository.metadata.base.MetadataTools;
 import org.apache.archiva.repository.metadata.base.RepositoryMetadataMerge;
 import org.apache.archiva.repository.metadata.base.RepositoryMetadataWriter;
+import org.apache.archiva.repository.storage.StorageAsset;
+import org.apache.archiva.repository.storage.fs.FilesystemStorage;
 import org.apache.archiva.scheduler.repository.model.RepositoryArchivaTaskScheduler;
 import org.apache.archiva.security.ServletAuthenticator;
 import org.apache.archiva.webdav.util.MimeTypes;
@@ -186,7 +188,6 @@ public class ArchivaDavResourceFactory
 
     @Inject
     public ArchivaDavResourceFactory( ApplicationContext applicationContext, ArchivaConfiguration archivaConfiguration )
-        throws PlexusSisuBridgeException
     {
         this.archivaConfiguration = archivaConfiguration;
         this.applicationContext = applicationContext;
@@ -282,7 +283,7 @@ public class ArchivaDavResourceFactory
             repositoryRequestInfo = repo.getRequestInfo();
             String logicalResource = getLogicalResource( archivaLocator, null, false );
             resourcesInAbsolutePath.add(
-                Paths.get( managedRepositoryContent.getRepoRoot(), logicalResource ).toAbsolutePath().toString() );
+                managedRepositoryContent.getRepository().getRoot().getFilePath().resolve(logicalResource ).toAbsolutePath().toString() );
 
         }
 
@@ -340,18 +341,19 @@ public class ArchivaDavResourceFactory
                             try
                             {
                                 Path metadataFile = Paths.get( resourceAbsPath );
-                                ArchivaRepositoryMetadata repoMetadata = MavenMetadataReader.read( metadataFile );
+                                FilesystemStorage storage = new FilesystemStorage( metadataFile.getParent( ), new DefaultFileLockManager( ) );
+                                ArchivaRepositoryMetadata repoMetadata = repositoryRegistry.getMetadataReader( repoGroup.getType( ) ).read( storage.getAsset( metadataFile.getFileName().toString() ) );
                                 mergedMetadata = RepositoryMetadataMerge.merge( mergedMetadata, repoMetadata );
-                            }
-                            catch (XMLException e )
-                            {
-                                throw new DavException( HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
-                                                        "Error occurred while reading metadata file." );
                             }
                             catch ( RepositoryMetadataException r )
                             {
                                 throw new DavException( HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
                                                         "Error occurred while merging metadata file." );
+                            }
+                            catch ( IOException e )
+                            {
+                                throw new DavException( HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
+                                    "Error occurred while merging metadata file." );
                             }
                         }
 
@@ -466,7 +468,7 @@ public class ArchivaDavResourceFactory
                         logicalResource = logicalResource.substring( 1 );
                     }
                     resourcesInAbsolutePath.add(
-                        Paths.get( managedRepositoryContent.getRepoRoot(), logicalResource ).toAbsolutePath().toString() );
+                        managedRepositoryContent.getRepository().getRoot().resolve( logicalResource ).getFilePath().toAbsolutePath().toString() );
                 }
                 catch ( DavException e )
                 {
@@ -646,15 +648,17 @@ public class ArchivaDavResourceFactory
                 if ( managedRepositoryContent.getRepository().getActiveReleaseSchemes().contains( ReleaseScheme.RELEASE ) && !repositoryRequestInfo.isMetadata(
                     resourcePath ) && !repositoryRequestInfo.isSupportFile( resourcePath ) )
                 {
-                    ArtifactReference artifact = null;
+                    // ArtifactReference artifact = null;
+                    Artifact artifact = null;
                     try
                     {
-                        artifact = managedRepositoryContent.toArtifactReference( resourcePath );
-
-                        if ( !VersionUtil.isSnapshot( artifact.getVersion() ) )
+                        BaseRepositoryContentLayout layout = managedRepositoryContent.getLayout( BaseRepositoryContentLayout.class );
+                        ContentItem artifactItem = managedRepositoryContent.toItem( resourcePath );
+                        artifact = layout.adaptItem( Artifact.class, artifactItem );
+                        if ( !VersionUtil.isSnapshot( artifact.getVersion().getId() ) )
                         {
                             // check if artifact already exists and if artifact re-deployment to the repository is allowed
-                            if ( managedRepositoryContent.hasContent( artifact )
+                            if ( artifactItem.exists()
                                 && managedRepositoryContent.getRepository().blocksRedeployments())
                             {
                                 log.warn( "Overwriting released artifacts in repository '{}' is not allowed.",
@@ -668,6 +672,10 @@ public class ArchivaDavResourceFactory
                     {
                         log.warn( "Artifact path '{}' is invalid.", resourcePath );
                     }
+                    catch ( ContentAccessException e )
+                    {
+                        e.printStackTrace( );
+                    }
                 }
 
                 /*
@@ -677,23 +685,23 @@ public class ArchivaDavResourceFactory
                  * create the collections themselves.
                  */
 
-                Path rootDirectory = Paths.get( managedRepositoryContent.getRepoRoot() );
-                Path destDir = rootDirectory.resolve( logicalResource.getPath() ).getParent();
+                StorageAsset rootDirectory = managedRepositoryContent.getRepository( ).getRoot();
+                StorageAsset destDir = rootDirectory.resolve( logicalResource.getPath() ).getParent();
 
-                if ( !Files.exists(destDir) )
+                if ( !destDir.exists() )
                 {
                     try
                     {
-                        Files.createDirectories( destDir );
+                        destDir.create();
                     }
                     catch ( IOException e )
                     {
                         log.error("Could not create directory {}: {}", destDir, e.getMessage(), e);
                         throw new DavException( HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Could not create directory "+destDir );
                     }
-                    String relPath = PathUtil.getRelative( rootDirectory.toAbsolutePath().toString(), destDir );
+                    String relPath = PathUtil.getRelative( rootDirectory.getPath(), destDir.getPath() );
 
-                    log.debug( "Creating destination directory '{}' (current user '{}')", destDir.getFileName(),
+                    log.debug( "Creating destination directory '{}' (current user '{}')", destDir.getName(),
                                activePrincipal );
 
                     triggerAuditEvent( request.getRemoteAddr(), managedRepositoryContent.getId(), relPath,
@@ -782,22 +790,23 @@ public class ArchivaDavResourceFactory
         try
         {
             // Get the artifact reference in a layout neutral way.
-            ArtifactReference artifact = repositoryRequestInfo.toArtifactReference( path );
+//             ArtifactReference artifact = repositoryRequestInfo.toArtifactReference( path );
+            ItemSelector selector = repositoryRequestInfo.toItemSelector( path );
 
-            if ( artifact != null )
+            if ( selector != null )
             {
                 String repositoryLayout = managedRepository.getLayout();
 
                 RepositoryStorage repositoryStorage =
                     this.applicationContext.getBean( "repositoryStorage#" + repositoryLayout, RepositoryStorage.class );
-                repositoryStorage.applyServerSideRelocation( managedRepository, artifact );
+                selector = repositoryStorage.applyServerSideRelocation( managedRepository, selector );
 
-                StorageAsset proxiedFile = proxyHandler.fetchFromProxies( managedRepository, artifact );
+                StorageAsset proxiedFile = proxyHandler.fetchFromProxies( managedRepository, selector );
 
-                resource.setPath( managedRepository.getContent().toPath( artifact ) );
+                resource.setPath( managedRepository.getContent().toPath( selector ) );
 
-                log.debug( "Proxied artifact '{}:{}:{}'", artifact.getGroupId(), artifact.getArtifactId(),
-                           artifact.getVersion() );
+                log.debug( "Proxied artifact '{}:{}:{}:{}'", selector.getNamespace(), selector.getArtifactId(),
+                           selector.getVersion(), selector.getArtifactVersion() );
 
                 return ( proxiedFile != null );
             }
@@ -1081,7 +1090,7 @@ public class ArchivaDavResourceFactory
                     }
                     try {
                         FilesystemStorage storage = new FilesystemStorage(tmpDirectory.getParent(), new DefaultFileLockManager());
-                        mergedRepositoryContents.add( storage.getAsset("") );
+                        mergedRepositoryContents.add( storage.getRoot() );
                     } catch (IOException e) {
                         throw new DavException(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Could not create storage for " + tmpDirectory);
                     }
@@ -1285,7 +1294,7 @@ public class ArchivaDavResourceFactory
     {
         try
         {
-            metadataTools.toVersionedReference( requestedResource );
+            metadataTools.toVersionedSelector( requestedResource );
             return false;
         }
         catch ( RepositoryMetadataException re )
@@ -1367,7 +1376,7 @@ public class ArchivaDavResourceFactory
                 Path tempRepoFile = Files.createTempDirectory( "temp" );
                 tempRepoFile.toFile( ).deleteOnExit( );
                 FilesystemStorage storage = new FilesystemStorage(tempRepoFile, new DefaultFileLockManager());
-                StorageAsset tmpAsset = storage.getAsset("");
+                StorageAsset tmpAsset = storage.getRoot();
 
                 IndexMergerRequest indexMergerRequest =
                     new IndexMergerRequest( authzRepos, true, id,

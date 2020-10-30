@@ -19,9 +19,14 @@ package org.apache.archiva.rest.api.services;
  * under the License.
  */
 
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.tags.Tags;
 import org.apache.archiva.admin.model.beans.ManagedRepository;
 import org.apache.archiva.redback.authorization.RedbackAuthorization;
+import org.apache.archiva.rest.api.model.ActionStatus;
 import org.apache.archiva.rest.api.model.ArchivaRepositoryStatistics;
+import org.apache.archiva.rest.api.model.FileStatus;
+import org.apache.archiva.rest.api.model.PomSnippet;
 import org.apache.archiva.security.common.ArchivaRoleConstants;
 
 import javax.ws.rs.Consumes;
@@ -39,6 +44,10 @@ import java.util.List;
  * @since 1.4-M1
  */
 @Path( "/managedRepositoriesService/" )
+@Tags( {
+    @Tag( name = "ManagedRepositories", description = "Administration for managed repositories" ),
+    @Tag( name = "Repositories" )
+})
 public interface ManagedRepositoriesService
 {
     @Path( "getManagedRepositories" )
@@ -59,8 +68,8 @@ public interface ManagedRepositoriesService
     @GET
     @Produces( { MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML, MediaType.TEXT_PLAIN } )
     @RedbackAuthorization( permissions = ArchivaRoleConstants.OPERATION_MANAGE_CONFIGURATION )
-    Boolean deleteManagedRepository( @QueryParam( "repositoryId" ) String repositoryId,
-                                     @QueryParam( "deleteContent" ) boolean deleteContent )
+    ActionStatus deleteManagedRepository( @QueryParam( "repositoryId" ) String repositoryId,
+                                          @QueryParam( "deleteContent" ) boolean deleteContent )
         throws ArchivaRestServiceException;
 
 
@@ -78,17 +87,17 @@ public interface ManagedRepositoriesService
     @Consumes( { MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML } )
     @Produces( { MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML, MediaType.TEXT_PLAIN } )
     @RedbackAuthorization( permissions = ArchivaRoleConstants.OPERATION_MANAGE_CONFIGURATION )
-    Boolean updateManagedRepository( ManagedRepository managedRepository )
+    ActionStatus updateManagedRepository( ManagedRepository managedRepository )
         throws ArchivaRestServiceException;
 
     /**
-     * @since 1.4-M3
+     * @since 3.0
      */
     @Path( "fileLocationExists" )
     @GET
     @Produces( { MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML, MediaType.TEXT_PLAIN } )
     @RedbackAuthorization( permissions = ArchivaRoleConstants.OPERATION_MANAGE_CONFIGURATION )
-    Boolean fileLocationExists( @QueryParam( "fileLocation" ) String fileLocation )
+    FileStatus getFileStatus( @QueryParam( "fileLocation" ) String fileLocation )
         throws ArchivaRestServiceException;
 
     /**
@@ -108,9 +117,9 @@ public interface ManagedRepositoriesService
      */
     @Path( "getPomSnippet/{repositoryId}" )
     @GET
-    @Produces( { MediaType.TEXT_PLAIN } )
+    @Produces( { MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML } )
     @RedbackAuthorization( permissions = ArchivaRoleConstants.OPERATION_MANAGE_CONFIGURATION )
-    String getPomSnippet( @PathParam( "repositoryId" ) String repositoryId )
+    PomSnippet getPomSnippet( @PathParam( "repositoryId" ) String repositoryId )
         throws ArchivaRestServiceException;
 
 

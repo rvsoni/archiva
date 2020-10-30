@@ -38,12 +38,11 @@ import org.apache.archiva.repository.RemoteRepository;
 import org.apache.archiva.repository.Repository;
 import org.apache.archiva.repository.RepositoryType;
 import org.apache.archiva.repository.UnsupportedRepositoryTypeException;
-import org.apache.archiva.repository.storage.FilesystemStorage;
+import org.apache.archiva.repository.storage.fs.FilesystemStorage;
 import org.apache.archiva.repository.storage.RepositoryStorage;
 import org.apache.archiva.repository.storage.StorageAsset;
 import org.apache.archiva.repository.features.IndexCreationFeature;
 import org.apache.archiva.repository.features.RemoteIndexFeature;
-import org.apache.archiva.repository.storage.StorageUtil;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.maven.index.ArtifactContext;
 import org.apache.maven.index.ArtifactContextProducer;
@@ -476,11 +475,7 @@ public class MavenIndexManager implements ArchivaIndexManager {
             } catch (IOException e) {
                 log.warn("Index close failed");
             }
-            try {
-                StorageUtil.deleteRecursively(context.getPath());
-            } catch (IOException e) {
-                throw new IndexUpdateFailedException("Could not delete index files");
-            }
+            org.apache.archiva.repository.storage.util.StorageUtil.deleteRecursively(context.getPath());
         });
         try {
             Repository repo = context.getRepository();
@@ -600,7 +595,7 @@ public class MavenIndexManager implements ArchivaIndexManager {
 
     private StorageAsset getIndexPath(URI indexDirUri, RepositoryStorage repoStorage, String defaultDir) throws IOException
     {
-        StorageAsset rootAsset = repoStorage.getAsset("");
+        StorageAsset rootAsset = repoStorage.getRoot();
         RepositoryStorage storage = rootAsset.getStorage();
         Path indexDirectory;
         Path repositoryPath = rootAsset.getFilePath().toAbsolutePath();
@@ -655,7 +650,7 @@ public class MavenIndexManager implements ArchivaIndexManager {
 
 
         // create remote repository path
-        Path repoDir = remoteRepository.getAsset( "" ).getFilePath();
+        Path repoDir = remoteRepository.getRoot().getFilePath();
         if ( !Files.exists( repoDir ) )
         {
             Files.createDirectories( repoDir );
@@ -714,7 +709,7 @@ public class MavenIndexManager implements ArchivaIndexManager {
 
         IndexingContext context;
         // take care first about repository location as can be relative
-        Path repositoryDirectory = repository.getAsset( "" ).getFilePath();
+        Path repositoryDirectory = repository.getRoot().getFilePath();
 
         if ( !Files.exists( repositoryDirectory ) )
         {

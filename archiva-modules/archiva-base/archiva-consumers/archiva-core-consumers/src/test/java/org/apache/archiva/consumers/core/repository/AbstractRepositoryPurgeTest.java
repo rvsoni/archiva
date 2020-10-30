@@ -23,9 +23,9 @@ import org.apache.archiva.metadata.model.ArtifactMetadata;
 import org.apache.archiva.metadata.repository.MetadataRepository;
 import org.apache.archiva.metadata.repository.RepositorySession;
 import org.apache.archiva.metadata.repository.RepositorySessionFactory;
-import org.apache.archiva.metadata.repository.storage.maven2.Maven2RepositoryPathTranslator;
-import org.apache.archiva.repository.base.BasicManagedRepository;
 import org.apache.archiva.repository.ManagedRepositoryContent;
+import org.apache.archiva.repository.maven.metadata.storage.Maven2RepositoryPathTranslator;
+import org.apache.archiva.repository.base.BasicManagedRepository;
 import org.apache.archiva.repository.ReleaseScheme;
 import org.apache.archiva.repository.RepositoryContentProvider;
 import org.apache.archiva.metadata.audit.RepositoryListener;
@@ -44,7 +44,6 @@ import org.springframework.test.context.ContextConfiguration;
 
 import javax.inject.Inject;
 import java.io.IOException;
-import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -163,7 +162,7 @@ public abstract class AbstractRepositoryPurgeTest
         atf.setRetentionPeriod( Period.ofDays( TEST_DAYS_OLDER) );
         String path = AbstractRepositoryPurgeTest.fixPath(
             basePath.resolve( repoId ).toAbsolutePath().toString() );
-        config.setLocation( new URI( path ) );
+        config.setLocation( Paths.get( path ).toFile().toURI() );
         atf.setDeleteReleasedSnapshots( true );
         atf.setRetentionCount( TEST_RETENTION_COUNT );
 

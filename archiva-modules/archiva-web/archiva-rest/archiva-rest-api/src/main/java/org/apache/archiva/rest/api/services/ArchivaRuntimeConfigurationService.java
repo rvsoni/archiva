@@ -18,8 +18,10 @@ package org.apache.archiva.rest.api.services;
  * under the License.
  */
 
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.apache.archiva.admin.model.beans.ArchivaRuntimeConfiguration;
 import org.apache.archiva.redback.authorization.RedbackAuthorization;
+import org.apache.archiva.rest.api.model.ActionStatus;
 import org.apache.archiva.security.common.ArchivaRoleConstants;
 
 import javax.ws.rs.Consumes;
@@ -34,6 +36,7 @@ import javax.ws.rs.core.MediaType;
  * @since 1.4-M4
  */
 @Path( "/archivaRuntimeConfigurationService/" )
+@Tag( name="Configuration" )
 public interface ArchivaRuntimeConfigurationService
 {
     @Path( "archivaRuntimeConfiguration" )
@@ -48,6 +51,6 @@ public interface ArchivaRuntimeConfigurationService
     @Produces( { MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML } )
     @Consumes( { MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML } )
     @RedbackAuthorization( permissions = ArchivaRoleConstants.OPERATION_MANAGE_CONFIGURATION )
-    Boolean updateArchivaRuntimeConfiguration( ArchivaRuntimeConfiguration archivaRuntimeConfiguration )
+    ActionStatus updateArchivaRuntimeConfiguration( ArchivaRuntimeConfiguration archivaRuntimeConfiguration )
         throws ArchivaRestServiceException;
 }

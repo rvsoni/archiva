@@ -18,8 +18,10 @@ package org.apache.archiva.rest.api.services;
  * under the License.
  */
 
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.apache.archiva.admin.model.beans.NetworkProxy;
 import org.apache.archiva.redback.authorization.RedbackAuthorization;
+import org.apache.archiva.rest.api.model.ActionStatus;
 import org.apache.archiva.security.common.ArchivaRoleConstants;
 
 import javax.ws.rs.Consumes;
@@ -36,6 +38,7 @@ import java.util.List;
  * @since 1.4-M1
  */
 @Path( "/networkProxyService/" )
+@Tag(name="Proxy", description = "Managing Network Proxies")
 public interface NetworkProxyService
 {
     @Path( "getNetworkProxies" )
@@ -72,6 +75,6 @@ public interface NetworkProxyService
     @GET
     @Produces( { MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML, MediaType.TEXT_PLAIN } )
     @RedbackAuthorization( permissions = ArchivaRoleConstants.OPERATION_MANAGE_CONFIGURATION )
-    Boolean deleteNetworkProxy( @PathParam( "networkProxyId" ) String networkProxyId )
+    ActionStatus deleteNetworkProxy( @PathParam( "networkProxyId" ) String networkProxyId )
         throws ArchivaRestServiceException;
 }

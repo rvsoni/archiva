@@ -22,11 +22,11 @@
 <configuration status="debug">
 
   <properties>
-    <property name="logsDirectory">${sys:appserver.base}/logs</property>
+    <property name="logsDirectory">${sys:appserver.base:-target}/logs</property>
   </properties>
 
   <appenders>
-    <Console name="console" target="SYSTEM_OUT" level="info">
+    <Console name="console" target="SYSTEM_OUT" >
       <!--PatternLayout pattern="%d{HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n"/-->
       <PatternLayout pattern="%highlight{%d{HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n}" />
     </Console>
@@ -92,7 +92,7 @@
     -->
 
     <root level="info" includeLocation="true">
-      <appender-ref ref="console"/>
+      <appender-ref ref="console" level="error" />
       <appender-ref ref="rolling"/>
     </root>
   </loggers>

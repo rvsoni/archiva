@@ -24,6 +24,7 @@ import org.apache.archiva.admin.model.beans.RemoteRepository;
 import org.apache.archiva.admin.model.beans.RepositoryGroup;
 import org.apache.archiva.maven2.model.Artifact;
 import org.apache.archiva.redback.integration.security.role.RedbackRoleConstants;
+import org.apache.archiva.redback.rest.services.BaseSetup;
 import org.apache.archiva.redback.rest.services.FakeCreateAdminService;
 import org.apache.archiva.rest.api.model.SearchRequest;
 import org.apache.archiva.rest.api.services.ManagedRepositoriesService;
@@ -43,10 +44,6 @@ import org.junit.runner.RunWith;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
@@ -145,7 +142,7 @@ public class DownloadMergedIndexNonDefaultPathTest
 
         // wait a bit to ensure index is finished
         int timeout = 20000;
-        while ( timeout > 0 && repositoriesService.alreadyScanning( id ) )
+        while ( timeout > 0 && repositoriesService.getScanStatus( id ).isAlreadyScanning() )
         {
             Thread.sleep( 500 );
             timeout -= 500;
@@ -200,7 +197,7 @@ public class DownloadMergedIndexNonDefaultPathTest
         remoteRepository.setUrl( "http://localhost:" + port + "/repository/test-group" );
         remoteRepository.setRemoteIndexUrl( "http://localhost:" + port + "/repository/test-group/" + path );
         remoteRepository.setUserName( RedbackRoleConstants.ADMINISTRATOR_ACCOUNT_NAME );
-        remoteRepository.setPassword( FakeCreateAdminService.ADMIN_TEST_PWD );
+        remoteRepository.setPassword( BaseSetup.getAdminPwd() );
 
         getRemoteRepositoriesService().addRemoteRepository( remoteRepository );
 

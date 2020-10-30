@@ -26,8 +26,8 @@ import org.apache.archiva.repository.base.ArchivaRepositoryRegistry;
 import org.apache.archiva.repository.RepositoryType;
 import org.apache.archiva.repository.features.IndexCreationFeature;
 import org.apache.archiva.repository.features.RemoteIndexFeature;
-import org.apache.archiva.repository.maven2.MavenManagedRepository;
-import org.apache.archiva.repository.maven2.MavenRemoteRepository;
+import org.apache.archiva.repository.maven.MavenManagedRepository;
+import org.apache.archiva.repository.maven.MavenRemoteRepository;
 import org.apache.archiva.test.utils.ArchivaSpringJUnit4ClassRunner;
 import org.apache.maven.index.MAVEN;
 import org.apache.maven.index.QueryCreator;
@@ -93,7 +93,7 @@ public class MavenIndexManagerTest {
     @Test
     public void pack() throws Exception {
         createTestContext();
-        Path destDir = repository.getAsset( "" ).getFilePath().resolve("org/apache/archiva/archiva-webapp/1.0");
+        Path destDir = repository.getRoot().getFilePath().resolve("org/apache/archiva/archiva-webapp/1.0");
         Path srcDir = Paths.get("src/test/maven-search-test-repo/org/apache/archiva/archiva-webapp/1.0");
         org.apache.commons.io.FileUtils.copyDirectory(srcDir.toFile(),destDir.toFile());
         mavenIndexManager.scan(ctx);
@@ -110,7 +110,7 @@ public class MavenIndexManagerTest {
     @Test
     public void scan() throws Exception {
         createTestContext();
-        Path destDir = repository.getAsset("").getFilePath().resolve("org/apache/archiva/archiva-webapp/1.0");
+        Path destDir = repository.getRoot().getFilePath().resolve("org/apache/archiva/archiva-webapp/1.0");
         Path srcDir = Paths.get("src/test/maven-search-test-repo/org/apache/archiva/archiva-webapp/1.0");
         org.apache.commons.io.FileUtils.copyDirectory(srcDir.toFile(),destDir.toFile());
         mavenIndexManager.scan(ctx);
@@ -138,25 +138,33 @@ public class MavenIndexManagerTest {
     public void addArtifactsToIndex() throws Exception {
 
         ArchivaIndexingContext ctx = createTestContext();
-        Path destDir = repository.getAsset( "" ).getFilePath().resolve("org/apache/archiva/archiva-search/1.0");
-        Path srcDir = Paths.get("src/test/maven-search-test-repo/org/apache/archiva/archiva-search/1.0");
-        org.apache.commons.io.FileUtils.copyDirectory(srcDir.toFile(), destDir.toFile());
-        List<URI> uriList = new ArrayList<>();
-        uriList.add(destDir.resolve("archiva-search-1.0.jar").toUri());
-        uriList.add(destDir.resolve("archiva-search-1.0-sources.jar").toUri());
-        mavenIndexManager.addArtifactsToIndex(ctx, uriList);
+        try {
+            Path destDir = repository.getRoot().getFilePath().resolve("org/apache/archiva/archiva-search/1.0");
+            Path srcDir = Paths.get("src/test/maven-search-test-repo/org/apache/archiva/archiva-search/1.0");
+            org.apache.commons.io.FileUtils.copyDirectory(srcDir.toFile(), destDir.toFile());
+            List<URI> uriList = new ArrayList<>();
+            uriList.add(destDir.resolve("archiva-search-1.0.jar").toUri());
+            uriList.add(destDir.resolve("archiva-search-1.0-sources.jar").toUri());
+            mavenIndexManager.addArtifactsToIndex(ctx, uriList);
 
-        IndexingContext mvnCtx = mavenIndexManager.getMvnContext(ctx);
-        String term = "org.apache.archiva";
-        Query q = new BooleanQuery.Builder().add( queryCreator.constructQuery( MAVEN.GROUP_ID, new UserInputSearchExpression( term ) ),
-                BooleanClause.Occur.SHOULD ).build();
-        assertEquals(2, mvnCtx.acquireIndexSearcher().count(q));
+            IndexingContext mvnCtx = mavenIndexManager.getMvnContext(ctx);
+            String term = "org.apache.archiva";
+            Query q = new BooleanQuery.Builder().add(queryCreator.constructQuery(MAVEN.GROUP_ID, new UserInputSearchExpression(term)),
+                    BooleanClause.Occur.SHOULD).build();
+            assertEquals(2, mvnCtx.acquireIndexSearcher().count(q));
+        } finally {
+            try {
+                ctx.close(true);
+            } catch (IOException e) {
+                // Ignore
+            }
+        }
     }
 
     @Test
     public void removeArtifactsFromIndex() throws Exception {
         ArchivaIndexingContext ctx = createTestContext();
-        Path destDir = repository.getAsset( "" ).getFilePath().resolve("org/apache/archiva/archiva-search/1.0");
+        Path destDir = repository.getRoot().getFilePath().resolve("org/apache/archiva/archiva-search/1.0");
         Path srcDir = Paths.get("src/test/maven-search-test-repo/org/apache/archiva/archiva-search/1.0");
         org.apache.commons.io.FileUtils.copyDirectory(srcDir.toFile(), destDir.toFile());
         List<URI> uriList = new ArrayList<>();
@@ -181,23 +189,32 @@ public class MavenIndexManagerTest {
     }
 
     private ArchivaIndexingContext createTestContext() throws URISyntaxException, IndexCreationFailedException, IOException {
-        indexPath = Paths.get("target/repositories/test-repo/.index-test");
-        FileUtils.deleteDirectory(indexPath);
+        String indexPathName = ".index-test." + System.nanoTime();
+        indexPath = Paths.get("target/repositories/test-repo" ).resolve(indexPathName);
+        if (Files.exists(indexPath)) {
+
+            try {
+                FileUtils.deleteDirectory(indexPath);
+            } catch (IOException e) {
+                String destName = indexPath.getFileName().toString() + "." + System.currentTimeMillis();
+                Files.move(indexPath, indexPath.getParent().resolve(destName));
+            }
+        }
         repository = MavenManagedRepository.newLocalInstance("test-repo", "Test Repo", Paths.get("target/repositories"));
         // repository.setLocation(new URI("test-repo"));
         IndexCreationFeature icf = repository.getFeature(IndexCreationFeature.class).get();
-        icf.setIndexPath(new URI(".index-test"));
+        icf.setIndexPath(new URI(indexPathName));
         ctx = mavenIndexManager.createContext(repository);
         return ctx;
     }
 
     private ArchivaIndexingContext createTestContextForRemote() throws URISyntaxException, IndexCreationFailedException, IOException {
-        indexPath = Paths.get("target/repositories/test-repo/.index-test");
+        // indexPath = Paths.get("target/repositories/test-repo/.index-test");
         Path repoPath = Paths.get("target/repositories").toAbsolutePath();
         repositoryRemote = MavenRemoteRepository.newLocalInstance("test-repo", "Test Repo", repoPath);
         repositoryRemote.setLocation(repoPath.resolve("test-repo").toUri());
         RemoteIndexFeature icf = repositoryRemote.getFeature(RemoteIndexFeature.class).get();
-        icf.setIndexUri(new URI(".index-test"));
+        icf.setIndexUri(new URI(indexPath.getFileName().toString()));
         ctx = mavenIndexManager.createContext(repositoryRemote);
         return ctx;
     }

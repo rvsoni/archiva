@@ -22,8 +22,7 @@ package org.apache.archiva.scheduler.repository;
 import org.apache.archiva.consumers.AbstractMonitoredConsumer;
 import org.apache.archiva.consumers.ConsumerException;
 import org.apache.archiva.consumers.KnownRepositoryContentConsumer;
-import org.apache.archiva.model.ArtifactReference;
-import org.apache.archiva.repository.LayoutException;
+import org.apache.archiva.repository.content.LayoutException;
 import org.apache.archiva.repository.ManagedRepository;
 import org.apache.archiva.repository.ManagedRepositoryContent;
 import org.apache.archiva.repository.RepositoryContentFactory;
@@ -42,7 +41,7 @@ public class TestConsumer
     extends AbstractMonitoredConsumer
     implements KnownRepositoryContentConsumer
 {
-    private Set<ArtifactReference> consumed = new HashSet<ArtifactReference>();
+    private Set<String> consumed = new HashSet<>();
 
     @Inject
     private RepositoryContentFactory factory;
@@ -97,11 +96,12 @@ public class TestConsumer
         {
             try
             {
-                consumed.add( repository.toArtifactReference( path ) );
+                repository.toItemSelector( path );
+                consumed.add( path );
             }
             catch ( LayoutException e )
             {
-                throw new ConsumerException( e.getMessage(), e );
+                // Layout exception for specific paths
             }
         }
     }
@@ -124,7 +124,7 @@ public class TestConsumer
         completeScan();
     }
 
-    public Collection<ArtifactReference> getConsumed()
+    public Collection<String> getConsumed()
     {
         return consumed;
     }

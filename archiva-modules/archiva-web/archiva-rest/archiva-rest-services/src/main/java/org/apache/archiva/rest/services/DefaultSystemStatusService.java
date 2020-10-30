@@ -26,10 +26,13 @@ import org.apache.archiva.components.taskqueue.TaskQueue;
 import org.apache.archiva.components.taskqueue.TaskQueueException;
 import org.apache.archiva.repository.scanner.RepositoryScanner;
 import org.apache.archiva.repository.scanner.RepositoryScannerInstance;
+import org.apache.archiva.rest.api.model.ActionStatus;
 import org.apache.archiva.rest.api.model.CacheEntry;
 import org.apache.archiva.rest.api.model.ConsumerScanningStatistics;
+import org.apache.archiva.rest.api.model.MemoryStatus;
 import org.apache.archiva.rest.api.model.QueueEntry;
 import org.apache.archiva.rest.api.model.RepositoryScannerStatistics;
+import org.apache.archiva.rest.api.model.Timestamp;
 import org.apache.archiva.rest.api.services.ArchivaRestServiceException;
 import org.apache.archiva.rest.api.services.SystemStatusService;
 import org.apache.archiva.rest.services.utils.ConsumerScanningStatisticsComparator;
@@ -85,7 +88,7 @@ public class DefaultSystemStatusService
     }
 
     @Override
-    public String getMemoryStatus()
+    public MemoryStatus getMemoryStatus()
         throws ArchivaRestServiceException
     {
         Runtime runtime = Runtime.getRuntime();
@@ -93,7 +96,7 @@ public class DefaultSystemStatusService
         long total = runtime.totalMemory();
         long used = total - runtime.freeMemory();
         long max = runtime.maxMemory();
-        return formatMemory( used ) + "/" + formatMemory( total ) + " (Max: " + formatMemory( max ) + ")";
+        return new MemoryStatus( formatMemory( used ) + "/" + formatMemory( total ) + " (Max: " + formatMemory( max ) + ")" );
     }
 
     private static String formatMemory( long l )
@@ -102,11 +105,11 @@ public class DefaultSystemStatusService
     }
 
     @Override
-    public String getCurrentServerTime( String locale )
+    public Timestamp getCurrentServerTime( String locale )
         throws ArchivaRestServiceException
     {
         SimpleDateFormat sdf = new SimpleDateFormat( "EEE, d MMM yyyy HH:mm:ss Z", new Locale( locale ) );
-        return sdf.format( new Date() );
+        return new Timestamp( sdf.format( new Date( ) ) );
     }
 
     @Override
@@ -165,7 +168,7 @@ public class DefaultSystemStatusService
     }
 
     @Override
-    public Boolean clearCache( String cacheKey )
+    public ActionStatus clearCache( String cacheKey )
         throws ArchivaRestServiceException
     {
         Cache cache = caches.get( cacheKey );
@@ -176,18 +179,18 @@ public class DefaultSystemStatusService
         }
 
         cache.clear();
-        return Boolean.TRUE;
+        return ActionStatus.SUCCESS;
     }
 
     @Override
-    public Boolean clearAllCaches()
+    public ActionStatus clearAllCaches()
         throws ArchivaRestServiceException
     {
         for ( Cache cache : caches.values() )
         {
             cache.clear();
         }
-        return Boolean.TRUE;
+        return ActionStatus.SUCCESS;
     }
 
     @Override

@@ -27,12 +27,12 @@
  *
  * Only the war and zip artifacts are archived in the jenkins build archive.
  */
-LABEL = 'ubuntu'
-buildJdk = 'JDK 1.8 (latest)'
-buildJdk9 = 'JDK 1.9 (latest)'
-buildJdk10 = 'JDK 10 (latest)'
-buildJdk11 = 'JDK 11 (latest)'
-buildMvn = 'Maven 3.5.4'
+LABEL = 'ubuntu && !H23'
+buildJdk = 'jdk_1.8_latest'
+buildJdk9 = 'jdk_1.9_latest'
+buildJdk10 = 'jdk_10_latest'
+buildJdk11 = 'jdk_11_latest'
+buildMvn = 'maven_3.5.4'
 //localRepository = ".repository"
 //localRepository = "../.maven_repositories/${env.EXECUTOR_NUMBER}"
 mavenOpts = '-Xms1g -Xmx2g -Djava.awt.headless=true'
@@ -43,7 +43,7 @@ publishers = [artifactsPublisher(disabled: false),
 cmdLine = (env.NONAPACHEORG_RUN != 'y' && env.BRANCH_NAME == 'master') ? "clean deploy" : "clean install"
 
 
-        INTEGRATION_PIPELINE = "Archiva-IntegrationTests-Gitbox"
+        INTEGRATION_PIPELINE = "/Archiva/Archiva-IntegrationTests-Gitbox"
 
 pipeline {
     agent {
@@ -51,7 +51,7 @@ pipeline {
     }
     // Build should also start, if redback has been built successfully
     triggers { 
-        upstream(upstreamProjects: 'Archiva-TLP-Gitbox/archiva-redback-core/master,Archiva-TLP-Gitbox/archiva-parent/master', threshold: hudson.model.Result.SUCCESS) 
+        upstream(upstreamProjects: 'Archiva/Archiva-TLP-Gitbox/archiva-redback-core/master,Archiva/Archiva-TLP-Gitbox/archiva-parent/master', threshold: hudson.model.Result.SUCCESS) 
     }
     options {
         disableConcurrentBuilds()
@@ -147,6 +147,8 @@ pipeline {
                                           options: publishers
                                 )
                                         {
+                                            sh "chmod 755 ./src/ci/scripts/prepareWorkspace.sh"
+                                            sh "./src/ci/scripts/prepareWorkspace.sh"
                                             sh "mvn clean install -U -B -e -fae -Dmaven.compiler.fork=true -Pci-build -T${THREADS}"
                                         }
                             }

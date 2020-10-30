@@ -34,14 +34,16 @@
     <slf4j.version>${slf4jVersion}</slf4j.version>
     <log4j.version>${log4jVersion}</log4j.version>
     <spring.version>${springVersion}</spring.version>
-    <guava.version>${guavaVersion}</guava.version>
     <springockito.version>${springockitoVersion}</springockito.version>
     <mockito.version>${mockitoVersion}</mockito.version>
     <httpclient.version>${httpclientVersion}</httpclient.version>
     <httpclient.core.version>${httpcoreVersion}</httpclient.core.version>
-    <asm.version>${asmVersion}</asm.version>
     <archiva.comp.version>${archivaCompVersion}</archiva.comp.version>
     <commons.beanutils.version>${beanUtilsVersion}</commons.beanutils.version>
+    <maven.wagon.version>${mavenWagonVersion}</maven.wagon.version>
+    <archiva.comp.version>${archivaCompVersion}</archiva.comp.version>
+    <jakarta.inject.version>${jakartaInjectVersion}</jakarta.inject.version>
+    <jakarta.annotation.version>${jakartaAnnotationVersion}</jakarta.annotation.version>
   </properties>
   <dependencies>
     <dependency>
@@ -52,11 +54,6 @@
     <dependency>
       <groupId>org.apache.archiva</groupId>
       <artifactId>archiva-configuration</artifactId>
-      <version>${archiva.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.archiva</groupId>
-      <artifactId>archiva-repository-admin-api</artifactId>
       <version>${archiva.version}</version>
     </dependency>
     <dependency>
@@ -76,6 +73,47 @@
     </dependency>
 
     <!-- Test scope -->
+    <dependency>
+      <groupId>org.apache.archiva</groupId>
+      <artifactId>archiva-proxy</artifactId>
+      <version>${archiva.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.archiva.maven</groupId>
+      <artifactId>archiva-maven-proxy</artifactId>
+      <version>${archiva.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.archiva.components</groupId>
+      <artifactId>archiva-components-spring-quartz</artifactId>
+      <version>${archiva.comp.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.archiva</groupId>
+      <artifactId>archiva-scheduler-repository</artifactId>
+      <version>${archivaVersion}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.maven.wagon</groupId>
+      <artifactId>wagon-http</artifactId>
+      <version>${maven.wagon.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.maven.wagon</groupId>
+      <artifactId>wagon-http-lightweight</artifactId>
+      <version>${maven.wagon.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.archiva</groupId>
+      <artifactId>repository-statistics</artifactId>
+      <version>${archiva.version}</version>
+    </dependency>
     <dependency>
       <groupId>org.apache.archiva.components.cache</groupId>
       <artifactId>archiva-components-spring-cache-ehcache</artifactId>
@@ -111,14 +149,14 @@
       <version>${slf4j.version}</version>
     </dependency>
     <dependency>
-      <groupId>javax.inject</groupId>
-      <artifactId>javax.inject</artifactId>
-      <version>1</version>
+      <groupId>jakarta.inject</groupId>
+      <artifactId>jakarta.inject-api</artifactId>
+      <version>${jakarta.inject.version}</version>
     </dependency>
     <dependency>
-      <groupId>javax.annotation</groupId>
-      <artifactId>javax.annotation-api</artifactId>
-      <version>1.3.2</version>
+      <groupId>jakarta.annotation</groupId>
+      <artifactId>jakarta.annotation-api</artifactId>
+      <version>${jakarta.annotation.version}</version>
     </dependency>
     <dependency>
       <groupId>org.springframework</groupId>
@@ -217,6 +255,7 @@
       <version>${log4j.version}</version>
       <scope>test</scope>
     </dependency>
+
     <dependency>
       <groupId>org.kubek2k</groupId>
       <artifactId>springockito</artifactId>
@@ -224,21 +263,11 @@
       <scope>test</scope>
     </dependency>
 
-    <dependency>
-      <groupId>org.ow2.asm</groupId>
-      <artifactId>asm</artifactId>
-      <scope>test</scope>
-    </dependency>
   </dependencies>
 
   <!-- match up with those used by Archiva -->
   <dependencyManagement>
     <dependencies>
-      <dependency>
-        <groupId>com.google.guava</groupId>
-        <artifactId>guava</artifactId>
-        <version>${guava.version}</version>
-      </dependency>
       <dependency>
         <groupId>org.mockito</groupId>
         <artifactId>mockito-all</artifactId>
@@ -253,11 +282,6 @@
         <groupId>org.apache.httpcomponents</groupId>
         <artifactId>httpcore</artifactId>
         <version>${httpclient.core.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.ow2.asm</groupId>
-        <artifactId>asm</artifactId>
-        <version>${asm.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>

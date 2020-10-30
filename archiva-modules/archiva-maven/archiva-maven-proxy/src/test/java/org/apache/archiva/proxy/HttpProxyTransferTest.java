@@ -23,7 +23,6 @@ import org.apache.archiva.configuration.ArchivaConfiguration;
 import org.apache.archiva.configuration.NetworkProxyConfiguration;
 import org.apache.archiva.configuration.ProxyConnectorConfiguration;
 import org.apache.archiva.configuration.RemoteRepositoryConfiguration;
-import org.apache.archiva.model.ArtifactReference;
 import org.apache.archiva.policies.CachedFailuresPolicy;
 import org.apache.archiva.policies.ChecksumPolicy;
 import org.apache.archiva.policies.PropagateErrorsDownloadPolicy;
@@ -31,14 +30,18 @@ import org.apache.archiva.policies.PropagateErrorsOnUpdateDownloadPolicy;
 import org.apache.archiva.policies.ReleasesPolicy;
 import org.apache.archiva.policies.SnapshotsPolicy;
 import org.apache.archiva.proxy.model.RepositoryProxyHandler;
-import org.apache.archiva.repository.*;
+import org.apache.archiva.repository.content.BaseRepositoryContentLayout;
+import org.apache.archiva.repository.ManagedRepository;
+import org.apache.archiva.repository.ManagedRepositoryContent;
+import org.apache.archiva.repository.RepositoryRegistry;
 import org.apache.archiva.repository.base.BasicManagedRepository;
+import org.apache.archiva.repository.content.Artifact;
 import org.apache.archiva.repository.storage.StorageAsset;
 import org.apache.archiva.test.utils.ArchivaSpringJUnit4ClassRunner;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.maven.wagon.Wagon;
 import org.apache.maven.wagon.providers.http.HttpWagon;
-import org.assertj.core.api.Assertions;
 import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.HttpConnectionFactory;
 import org.eclipse.jetty.server.Request;
@@ -209,8 +212,8 @@ public class HttpProxyTransferTest
     public void testGetOverHttpProxy()
         throws Exception
     {
-        Assertions.assertThat( System.getProperty( "http.proxyHost", "" ) ).isEmpty();
-        Assertions.assertThat( System.getProperty( "http.proxyPort", "" ) ).isEmpty();
+        assertTrue( StringUtils.isEmpty( System.getProperty( "http.proxyHost" , "" ) ));
+        assertTrue( StringUtils.isEmpty( System.getProperty( "http.proxyPort", "" ) ) );
 
         String path = "org/apache/maven/test/get-default-layout/1.0/get-default-layout-1.0.jar";
 
@@ -219,9 +222,10 @@ public class HttpProxyTransferTest
 
         managedDefaultRepository = repositoryRegistry.getManagedRepository(MANAGED_ID).getContent();
 
-        Path expectedFile = Paths.get( managedDefaultRepository.getRepoRoot() ).resolve( path );
+        BaseRepositoryContentLayout layout = managedDefaultRepository.getLayout( BaseRepositoryContentLayout.class );
+        Path expectedFile = managedDefaultRepository.getRepository().getRoot().resolve( path ).getFilePath();
         Files.deleteIfExists( expectedFile );
-        ArtifactReference artifact = managedDefaultRepository.toArtifactReference( path );
+        Artifact artifact = layout.getArtifact( path );
 
         // Attempt the proxy fetch.
         StorageAsset downloadedFile = proxyHandler.fetchFromProxies( managedDefaultRepository.getRepository(), artifact );
@@ -238,8 +242,8 @@ public class HttpProxyTransferTest
         String actualContents = FileUtils.readFileToString( downloadedFile.getFilePath().toFile(), Charset.defaultCharset() );
         assertEquals( "Check file contents.", expectedContents, actualContents );
 
-        Assertions.assertThat( System.getProperty( "http.proxyHost" , "") ).isEmpty();
-        Assertions.assertThat( System.getProperty( "http.proxyPort" , "") ).isEmpty();
+        assertTrue( StringUtils.isEmpty( System.getProperty( "http.proxyHost", "" ) ) );
+        assertTrue( StringUtils.isEmpty( System.getProperty( "http.proxyPort" , "") ) );
     }
 
     private void addConnector()

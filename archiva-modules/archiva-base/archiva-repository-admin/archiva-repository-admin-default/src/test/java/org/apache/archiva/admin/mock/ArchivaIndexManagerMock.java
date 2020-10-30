@@ -39,12 +39,11 @@ import org.apache.archiva.repository.RemoteRepository;
 import org.apache.archiva.repository.Repository;
 import org.apache.archiva.repository.RepositoryType;
 import org.apache.archiva.repository.UnsupportedRepositoryTypeException;
-import org.apache.archiva.repository.storage.FilesystemAsset;
-import org.apache.archiva.repository.storage.FilesystemStorage;
+import org.apache.archiva.repository.storage.fs.FilesystemAsset;
+import org.apache.archiva.repository.storage.fs.FilesystemStorage;
 import org.apache.archiva.repository.storage.StorageAsset;
 import org.apache.archiva.repository.features.IndexCreationFeature;
 import org.apache.archiva.repository.features.RemoteIndexFeature;
-import org.apache.archiva.repository.storage.StorageUtil;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.maven.index.ArtifactContext;
 import org.apache.maven.index.ArtifactContextProducer;
@@ -455,11 +454,7 @@ public class ArchivaIndexManagerMock implements ArchivaIndexManager {
             } catch (IOException e) {
                 log.warn("Index close failed");
             }
-            try {
-                StorageUtil.deleteRecursively(context.getPath());
-            } catch (IOException e) {
-                throw new IndexUpdateFailedException("Could not delete index files");
-            }
+            org.apache.archiva.repository.storage.util.StorageUtil.deleteRecursively(context.getPath());
         });
         try {
             Repository repo = context.getRepository();
@@ -527,11 +522,11 @@ public class ArchivaIndexManagerMock implements ArchivaIndexManager {
 
     private StorageAsset getIndexPath( Repository repo) throws IOException {
         IndexCreationFeature icf = repo.getFeature(IndexCreationFeature.class).get();
-        Path repoDir = repo.getAsset("").getFilePath();
+        Path repoDir = repo.getRoot().getFilePath();
         URI indexDir = icf.getIndexPath();
         String indexPath = indexDir.getPath();
         Path indexDirectory = null;
-        FilesystemStorage filesystemStorage = (FilesystemStorage) repo.getAsset("").getStorage();
+        FilesystemStorage filesystemStorage = (FilesystemStorage) repo.getRoot().getStorage();
         if ( ! StringUtils.isEmpty(indexDir.toString( ) ) )
         {
 
@@ -568,7 +563,7 @@ public class ArchivaIndexManagerMock implements ArchivaIndexManager {
 
 
         // create remote repository path
-        Path repoDir = remoteRepository.getAsset("").getFilePath();
+        Path repoDir = remoteRepository.getRoot().getFilePath();
         if ( !Files.exists( repoDir ) )
         {
             Files.createDirectories( repoDir );
@@ -618,7 +613,7 @@ public class ArchivaIndexManagerMock implements ArchivaIndexManager {
 
         IndexingContext context;
         // take care first about repository location as can be relative
-        Path repositoryDirectory = repository.getAsset("").getFilePath();
+        Path repositoryDirectory = repository.getRoot().getFilePath();
 
         if ( !Files.exists( repositoryDirectory ) )
         {

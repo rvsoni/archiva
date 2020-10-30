@@ -20,11 +20,10 @@ package org.apache.archiva.repository.mock;
  */
 
 import org.apache.archiva.common.utils.VersionUtil;
-import org.apache.archiva.model.ArtifactReference;
-import org.apache.archiva.model.RepositoryURL;
-import org.apache.archiva.repository.LayoutException;
+import org.apache.archiva.repository.content.LayoutException;
 import org.apache.archiva.repository.RemoteRepository;
 import org.apache.archiva.repository.RemoteRepositoryContent;
+import org.apache.archiva.repository.content.ItemSelector;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
@@ -53,40 +52,29 @@ public class RemoteRepositoryContentMock implements RemoteRepositoryContent
     }
 
     @Override
-    public RepositoryURL getURL( )
-    {
-        return new RepositoryURL(repository.getLocation().toString());
-    }
-
-    @Override
     public void setRepository( RemoteRepository repo )
     {
         this.repository = repo;
     }
 
     @Override
-    public ArtifactReference toArtifactReference( String path ) throws LayoutException
-    {
-        return null;
-    }
-
-    @Override
-    public String toPath( ArtifactReference reference )
+    public String toPath( ItemSelector selector )
     {
         String baseVersion;
-        if (VersionUtil.isSnapshot(reference.getVersion())) {
-            baseVersion=VersionUtil.getBaseVersion(reference.getVersion());
+        if (!selector.hasVersion() && VersionUtil.isSnapshot(selector.getArtifactVersion())) {
+            baseVersion=VersionUtil.getBaseVersion(selector.getArtifactVersion());
         } else {
-            baseVersion=reference.getVersion();
+            baseVersion=selector.getVersion();
         }
-        return reference.getGroupId().replaceAll("\\.", "/")+"/"+reference.getArtifactId()+"/"+baseVersion+"/"
-                +reference.getArtifactId()+"-"+reference.getVersion()+(
-                StringUtils.isNotEmpty(reference.getClassifier()) ? "-"+reference.getClassifier() : "")+"."+reference.getType();
+        return selector.getNamespace().replaceAll("\\.", "/")+"/"+selector.getArtifactId()+"/"+baseVersion+"/"
+            +selector.getArtifactId()+"-"+selector.getVersion()+(
+            StringUtils.isNotEmpty(selector.getClassifier()) ? "-"+selector.getClassifier() : "")+"."+selector.getType();
     }
 
     @Override
-    public RepositoryURL toURL( ArtifactReference reference )
+    public ItemSelector toItemSelector( String path ) throws LayoutException
     {
         return null;
     }
+
 }

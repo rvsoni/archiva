@@ -25,7 +25,7 @@ import org.apache.archiva.common.filelock.DefaultFileLockManager;
 import org.apache.archiva.configuration.ArchivaConfiguration;
 import org.apache.archiva.repository.base.BasicManagedRepository;
 import org.apache.archiva.repository.RepositoryRegistry;
-import org.apache.archiva.repository.storage.FilesystemStorage;
+import org.apache.archiva.repository.storage.fs.FilesystemStorage;
 import org.apache.archiva.test.utils.ArchivaSpringJUnit4ClassRunner;
 import org.apache.commons.codec.Encoder;
 import org.apache.commons.codec.binary.Base64;
@@ -38,6 +38,7 @@ import org.junit.runner.RunWith;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.NoSuchBeanDefinitionException;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.config.AutowireCapableBeanFactory;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationEvent;
@@ -256,6 +257,18 @@ public class RssFeedServletTest
         }
 
         @Override
+        public <T> ObjectProvider<T> getBeanProvider( Class<T> aClass )
+        {
+            return null;
+        }
+
+        @Override
+        public <T> ObjectProvider<T> getBeanProvider( ResolvableType resolvableType )
+        {
+            return null;
+        }
+
+        @Override
         public <T> Map<String, T> getBeansOfType( Class<T> tClass, boolean b, boolean b2 )
             throws BeansException
         {
@@ -345,6 +358,12 @@ public class RssFeedServletTest
         }
 
         @Override
+        public Class<?> getType( String s, boolean b ) throws NoSuchBeanDefinitionException
+        {
+            return null;
+        }
+
+        @Override
         public String[] getAliases( String s )
         {
             return applicationContext.getAliases( s );
@@ -397,6 +416,12 @@ public class RssFeedServletTest
 
         @Override
         public String[] getBeanNamesForType( ResolvableType resolvableType )
+        {
+            return new String[0];
+        }
+
+        @Override
+        public String[] getBeanNamesForType( ResolvableType resolvableType, boolean b, boolean b1 )
         {
             return new String[0];
         }

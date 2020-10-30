@@ -49,9 +49,6 @@
     <requiredProperty key="springVersion">
       <defaultValue>${spring.version}</defaultValue>
     </requiredProperty>
-    <requiredProperty key="guavaVersion">
-      <defaultValue>${guava.version}</defaultValue>
-    </requiredProperty>
     <requiredProperty key="springockitoVersion">
       <defaultValue>${springockito.version}</defaultValue>
     </requiredProperty>
@@ -64,8 +61,16 @@
     <requiredProperty key="httpcoreVersion">
       <defaultValue>${httpclient.core.version}</defaultValue>
     </requiredProperty>
-    <requiredProperty key="asmVersion">
-      <defaultValue>${asm.version}</defaultValue>
+    <requiredProperty key="mavenWagonVersion">
+      <defaultValue>${wagon.version}</defaultValue>
     </requiredProperty>
+    <requiredProperty key="jakartaInjectVersion">
+      <defaultValue>${jakarta.inject.version}</defaultValue>
+    </requiredProperty>
+    <requiredProperty key="jakartaAnnotationVersion">
+      <defaultValue>${jakarta.annotation.version}</defaultValue>
+    </requiredProperty>
+
+
   </requiredProperties>
 </archetype-descriptor>

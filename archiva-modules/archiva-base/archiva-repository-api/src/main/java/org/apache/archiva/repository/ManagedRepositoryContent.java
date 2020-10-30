@@ -9,8 +9,7 @@ package org.apache.archiva.repository;
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- *  http://www.apache.org/licenses/LICENSE-2.0
- *
+ * http://www.apache.org/licenses/LICENSE-2.0
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -19,60 +18,33 @@ package org.apache.archiva.repository;
  * under the License.
  */
 
-import org.apache.archiva.model.ArchivaArtifact;
-import org.apache.archiva.model.ArtifactReference;
-import org.apache.archiva.model.ProjectReference;
-import org.apache.archiva.model.VersionedReference;
+import org.apache.archiva.repository.content.ContentAccessException;
+import org.apache.archiva.repository.content.ContentItem;
+import org.apache.archiva.repository.content.ItemNotFoundException;
+import org.apache.archiva.repository.content.ItemSelector;
+import org.apache.archiva.repository.content.LayoutException;
+import org.apache.archiva.repository.content.ManagedRepositoryContentLayout;
 import org.apache.archiva.repository.storage.StorageAsset;
 
-import java.util.Set;
+import java.util.List;
+import java.util.function.Consumer;
+import java.util.stream.Stream;
 
 /**
- * ManagedRepositoryContent interface for interacting with a managed repository in an abstract way,
- * without the need for processing based on filesystem paths, or working with the database.
- *
- * This interface
+ * @author Martin Stockhammer <martin_s@apache.org>
  */
 public interface ManagedRepositoryContent extends RepositoryContent
 {
 
 
-
     /**
-     * Delete from the managed repository all files / directories associated with the
-     * provided version reference.
+     * Returns the path of the given item.
      *
-     * @param reference the version reference to delete.
-     * @throws ContentNotFoundException
+     * @param item
+     * @return
      */
-    void deleteVersion( VersionedReference reference )
-        throws ContentNotFoundException;
+    String toPath( ContentItem item );
 
-    /**
-     * delete a specified artifact from the repository
-     *
-     * @param artifactReference
-     * @throws ContentNotFoundException
-     */
-    void deleteArtifact( ArtifactReference artifactReference )
-        throws ContentNotFoundException;
-
-    /**
-     * @param groupId
-     * @throws ContentNotFoundException
-     * @since 1.4-M3
-     */
-    void deleteGroupId( String groupId )
-        throws ContentNotFoundException;
-
-    /**
-     *
-     * @param namespace groupId for maven
-     * @param projectId artifactId for maven
-     * @throws ContentNotFoundException
-     */
-    void deleteProject( String namespace, String projectId )
-        throws RepositoryException;
 
     /**
      * <p>
@@ -87,33 +59,86 @@ public interface ManagedRepositoryContent extends RepositoryContent
     String getId();
 
     /**
-     * <p>
-     * Gather up the list of related artifacts to the ArtifactReference provided.
-     * This typically inclues the pom files, and those things with
-     * classifiers (such as doc, source code, test libs, etc...)
-     * </p>
-     * <p>
-     * <strong>NOTE:</strong> Some layouts (such as maven 1 "legacy") are not compatible with this query.
-     * </p>
+     * Delete all items that match the given selector. The type and number of deleted items
+     * depend on the specific selector:
+     * <ul>
+     *     <li>namespace: the complete namespace is deleted (recursively if the recurse flag is set)</li>
+     *     <li>project: the complete project and all contained versions are deleted</li>
+     *     <li>version: the version inside the project is deleted (project is required)</li>
+     *     <li>artifactId: all artifacts that match the id (project and version are required)</li>
+     *     <li>artifactVersion: all artifacts that match the version (project and version are required)</li>
+     *     <li></li>
+     * </ul>
      *
-     * @param reference the reference to work off of.
-     * @return the set of ArtifactReferences for related artifacts.
-     * @throws ContentNotFoundException if the initial artifact reference does not exist within the repository.
+     * @param selector the item selector that selects the artifacts to delete
+     * @param consumer a consumer of the items that will be called after deletion
+     * @returns the list of items that are deleted
+     * @throws ContentAccessException if the deletion was not possible or only partly successful, because the access
+     * to the artifacts failed
+     * @throws IllegalArgumentException if the selector does not specify valid artifacts to delete
      */
-    Set<ArtifactReference> getRelatedArtifacts( ArtifactReference reference )
-        throws ContentNotFoundException;
+    void deleteAllItems( ItemSelector selector, Consumer<ItemDeleteStatus> consumer ) throws ContentAccessException, IllegalArgumentException;
 
     /**
-     * <p>
-     * Convenience method to get the repository (on disk) root directory.
-     * </p>
-     * <p>
-     * Equivalent to calling <code>.getRepository().getLocation()</code>
-     * </p>
+     * Removes the specified content item and if the item is a container or directory,
+     * all content stored under the given item.
      *
-     * @return the repository (on disk) root directory.
+     * @param item the item.
+     * @throws ItemNotFoundException if the item cannot be found
+     * @throws ContentAccessException if the deletion was not possible or only partly successful, because the access
+     *  to the artifacts failed
      */
-    String getRepoRoot();
+    void deleteItem( ContentItem item ) throws ItemNotFoundException, ContentAccessException;
+
+    /**
+     * Returns a item for the given selector. The type of the returned item depends on the
+     * selector.
+     *
+     * @param selector the item selector
+     * @return the content item that matches the given selector
+     * @throws ContentAccessException if an error occured while accessing the backend
+     * @throws IllegalArgumentException if the selector does not select a valid content item
+     */
+    ContentItem getItem( ItemSelector selector ) throws ContentAccessException, IllegalArgumentException;
+
+    /**
+     * Returns a stream of items that match the given selector. It may return a stream of mixed types,
+     * like namespaces, projects, versions and artifacts. It will not select a specific type.
+     * The selector can specify the '*' pattern for all fields.
+     * The returned elements will be provided by depth first.
+     *
+     * @param selector the item selector that specifies the items
+     * @return the stream of content items
+     * @throws ContentAccessException if the access to the underlying storage failed
+     * @throws IllegalArgumentException if a illegal coordinate combination was provided
+     */
+    Stream<? extends ContentItem> newItemStream( ItemSelector selector, boolean parallel ) throws ContentAccessException, IllegalArgumentException;
+
+    /**
+     * Returns the item that matches the given path. The item at the path must not exist.
+     *
+     * @param path the path string that points to the item
+     * @return the content item if the path is a valid item path
+     * @throws LayoutException if the path is not valid for the repository layout
+     */
+    ContentItem toItem( String path ) throws LayoutException;
+
+    /**
+     * Returns the item that matches the given asset path. The asset must not exist.
+     *
+     * @param assetPath the path to the artifact or directory
+     * @return the item, if it is a valid path for the repository layout
+     * @throws LayoutException if the path is not valid for the repository
+     */
+    ContentItem toItem( StorageAsset assetPath ) throws LayoutException;
+
+    /**
+     * Returns true, if the selector coordinates point to a existing item in the repository.
+     *
+     * @param selector the item selector
+     * @return <code>true</code>, if there exists such a item, otherwise <code>false</code>
+     */
+    boolean hasContent( ItemSelector selector );
 
     /**
      * Get the repository configuration associated with this
@@ -124,106 +149,57 @@ public interface ManagedRepositoryContent extends RepositoryContent
     ManagedRepository getRepository();
 
     /**
-     * Given a specific {@link ProjectReference}, return the list of available versions for
-     * that project reference.
-     *
-     * @param reference the project reference to work off of.
-     * @return the list of versions found for that project reference.
-     * @throws ContentNotFoundException if the project reference does nto exist within the repository.
-     * @throws LayoutException
-     */
-    Set<String> getVersions( ProjectReference reference )
-        throws ContentNotFoundException, LayoutException;
-
-    /**
-     * <p>
-     * Given a specific {@link VersionedReference}, return the list of available versions for that
-     * versioned reference.
-     * </p>
-     * <p>
-     * <strong>NOTE:</strong> This is really only useful when working with SNAPSHOTs.
-     * </p>
-     *
-     * @param reference the versioned reference to work off of.
-     * @return the set of versions found.
-     * @throws ContentNotFoundException if the versioned reference does not exist within the repository.
-     */
-    Set<String> getVersions( VersionedReference reference )
-        throws ContentNotFoundException;
-
-    /**
-     * Determines if the artifact referenced exists in the repository.
-     *
-     * @param reference the artifact reference to check for.
-     * @return true if the artifact referenced exists.
-     */
-    boolean hasContent( ArtifactReference reference );
-
-    /**
-     * Determines if the project referenced exists in the repository.
-     *
-     * @param reference the project reference to check for.
-     * @return true it the project referenced exists.
-     */
-    boolean hasContent( ProjectReference reference );
-
-    /**
-     * Determines if the version reference exists in the repository.
-     *
-     * @param reference the version reference to check for.
-     * @return true if the version referenced exists.
-     */
-    boolean hasContent( VersionedReference reference );
-
-    /**
      * Set the repository configuration to associate with this
      * repository content.
      *
      * @param repo the repository to associate with this repository content.
      */
-    void setRepository( org.apache.archiva.repository.ManagedRepository repo );
+    void setRepository( ManagedRepository repo );
 
     /**
-     * Given an {@link ArtifactReference}, return the file reference to the artifact.
-     *
-     * @param reference the artifact reference to use.
-     * @return the relative path to the artifact.
+     * Returns the parent of the item.
+     * @param item the current item
+     * @return the parent item, or <code>null</code> if no such item exists
      */
-    StorageAsset toFile( ArtifactReference reference );
+    ContentItem getParent(ContentItem item);
 
     /**
-     * Given an {@link ArchivaArtifact}, return the file reference to the artifact.
-     *
-     * @param reference the archiva artifact to use.
-     * @return the relative path to the artifact.
+     * Returns the list of children items.
+     * @param item the current item
+     * @return the list of children, or a empty list, if no children exist
      */
-    StorageAsset toFile( ArchivaArtifact reference );
+    List<? extends ContentItem> getChildren( ContentItem item);
 
     /**
-     * Given a {@link ProjectReference}, return the path to the metadata for
-     * the project.
+     * Tries to apply the given characteristic to the content item. If the layout does not allow this,
+     * it will throw a <code>LayoutException</code>.
      *
-     * @param reference the reference to use.
-     * @return the path to the metadata file, or null if no metadata is appropriate.
+     * @param clazz the characteristic class to apply
+     * @param item the content item
+     * @param <T> The characteristic
+     * @return the applied characteristic
      */
-    String toMetadataPath( ProjectReference reference );
+    <T extends ContentItem> T applyCharacteristic(Class<T> clazz, ContentItem item) throws LayoutException;
 
     /**
-     * Given a {@link VersionedReference}, return the path to the metadata for
-     * the specific version of the project.
-     *
-     * @param reference the reference to use.
-     * @return the path to the metadata file, or null if no metadata is appropriate.
+     * Returns the given layout from the content.
+     * @param clazz The layout class
+     * @param <T> the layout class
+     * @return the specific layout
+     * @throws LayoutException if the repository does not support this layout type
      */
-    String toMetadataPath( VersionedReference reference );
+    <T extends ManagedRepositoryContentLayout> T getLayout( Class<T> clazz) throws LayoutException;
 
     /**
-     * Given an {@link ArchivaArtifact}, return the relative path to the artifact.
-     *
-     * @param reference the archiva artifact to use.
-     * @return the relative path to the artifact.
+     * Returns <code>true</code>, if the specific layout is supported by this content.
+     * @param clazz the layout class
+     * @return <code>true</code>, if the layout is supported, otherwise <code>false</code>
      */
-    String toPath( ArchivaArtifact reference );
+    <T extends ManagedRepositoryContentLayout> boolean supportsLayout(Class<T> clazz);
 
-
+    /**
+     * Returns a list of supported layout classes
+     * @return
+     */
+    List<Class<? extends ManagedRepositoryContentLayout>> getSupportedLayouts( );
 }

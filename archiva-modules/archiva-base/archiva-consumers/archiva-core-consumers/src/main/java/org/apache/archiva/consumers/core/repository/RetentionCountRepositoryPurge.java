@@ -21,22 +21,23 @@ package org.apache.archiva.consumers.core.repository;
 
 import org.apache.archiva.common.utils.VersionComparator;
 import org.apache.archiva.common.utils.VersionUtil;
-import org.apache.archiva.metadata.repository.RepositorySession;
-import org.apache.archiva.model.ArtifactReference;
-import org.apache.archiva.model.VersionedReference;
-import org.apache.archiva.repository.ContentNotFoundException;
-import org.apache.archiva.repository.LayoutException;
-import org.apache.archiva.repository.ManagedRepositoryContent;
 import org.apache.archiva.metadata.audit.RepositoryListener;
+import org.apache.archiva.metadata.repository.RepositorySession;
+import org.apache.archiva.repository.content.BaseRepositoryContentLayout;
+import org.apache.archiva.repository.content.ContentAccessException;
+import org.apache.archiva.repository.content.LayoutException;
+import org.apache.archiva.repository.ManagedRepositoryContent;
+import org.apache.archiva.repository.content.Artifact;
+import org.apache.archiva.repository.content.ContentItem;
+import org.apache.archiva.repository.content.base.ArchivaItemSelector;
+import org.apache.commons.lang3.StringUtils;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Purge the repository by retention count. Retain only the specified number of snapshots.
@@ -59,23 +60,34 @@ public class RetentionCountRepositoryPurge
     {
         try
         {
-            Path artifactFile = Paths.get( repository.getRepoRoot( ), path );
-
-            if ( !Files.exists(artifactFile) )
+            ContentItem item = repository.toItem( path );
+            BaseRepositoryContentLayout layout = repository.getLayout( BaseRepositoryContentLayout.class );
+            Artifact artifact = layout.adaptItem( Artifact.class, item );
+            if ( !artifact.exists( ) )
             {
                 return;
             }
 
-            ArtifactReference artifact = repository.toArtifactReference( path );
-
-            if ( VersionUtil.isSnapshot( artifact.getVersion( ) ) )
+            if ( VersionUtil.isSnapshot( artifact.getVersion( ).getId( ) ) )
             {
-                VersionedReference reference = new VersionedReference( );
-                reference.setGroupId( artifact.getGroupId( ) );
-                reference.setArtifactId( artifact.getArtifactId( ) );
-                reference.setVersion( artifact.getVersion( ) );
+                ArchivaItemSelector selector = ArchivaItemSelector.builder( )
+                    .withNamespace( artifact.getVersion( ).getProject( ).getNamespace( ).getId( ) )
+                    .withProjectId( artifact.getVersion( ).getProject( ).getId( ) )
+                    .withArtifactId( artifact.getId( ) )
+                    .withVersion( artifact.getVersion( ).getId( ) )
+                    .withClassifier( "*" )
+                    .includeRelatedArtifacts( )
+                    .build( );
 
-                List<String> versions = new ArrayList<>( repository.getVersions( reference ) );
+
+                List<String> versions;
+                try ( Stream<? extends Artifact> stream = repository.getLayout( BaseRepositoryContentLayout.class ).newArtifactStream( selector ) )
+                {
+                    versions = stream.map( a -> a.getArtifactVersion( ) )
+                        .filter( StringUtils::isNotEmpty )
+                        .distinct( )
+                        .collect( Collectors.toList( ) );
+                }
 
                 Collections.sort( versions, VersionComparator.getInstance( ) );
 
@@ -86,15 +98,26 @@ public class RetentionCountRepositoryPurge
                     return;
                 }
 
+                ArchivaItemSelector.Builder selectorBuilder = ArchivaItemSelector.builder( )
+                    .withNamespace( artifact.getVersion( ).getProject( ).getNamespace( ).getId( ) )
+                    .withProjectId( artifact.getVersion( ).getProject( ).getId( ) )
+                    .withArtifactId( artifact.getId( ) )
+                    .withClassifier( "*" )
+                    .includeRelatedArtifacts( )
+                    .withVersion( artifact.getVersion( ).getId( ) );
                 int countToPurge = versions.size( ) - retentionCount;
-                Set<ArtifactReference> artifactsToDelete = new HashSet<>( );
+                Set<Artifact> artifactsToDelete = new HashSet<>( );
                 for ( String version : versions )
                 {
                     if ( countToPurge-- <= 0 )
                     {
                         break;
                     }
-                    artifactsToDelete.addAll( repository.getRelatedArtifacts( getNewArtifactReference( artifact, version ) ) );
+                    List<? extends Artifact> delArtifacts = repository.getLayout( BaseRepositoryContentLayout.class ).getArtifacts( selectorBuilder.withArtifactVersion( version ).build( ) );
+                    if ( delArtifacts != null && delArtifacts.size( ) > 0 )
+                    {
+                        artifactsToDelete.addAll( delArtifacts );
+                    }
                 }
                 purge( artifactsToDelete );
             }
@@ -103,25 +126,11 @@ public class RetentionCountRepositoryPurge
         {
             throw new RepositoryPurgeException( le.getMessage( ), le );
         }
-        catch ( ContentNotFoundException e )
+        catch ( ContentAccessException e )
         {
-            log.error( "Repostory artifact not found {}", path );
+            log.error( "Error while accessing the repository data: {}", e.getMessage( ), e );
+            throw new RepositoryPurgeException( e.getMessage( ), e );
         }
     }
 
-    /*
-     * Returns a new artifact reference with different version
-     */
-    private ArtifactReference getNewArtifactReference( ArtifactReference reference, String version )
-        throws LayoutException
-    {
-        ArtifactReference artifact = new ArtifactReference( );
-        artifact.setGroupId( reference.getGroupId( ) );
-        artifact.setArtifactId( reference.getArtifactId( ) );
-        artifact.setVersion( version );
-        artifact.setClassifier( reference.getClassifier( ) );
-        artifact.setType( reference.getType( ) );
-        return artifact;
-
-    }
 }

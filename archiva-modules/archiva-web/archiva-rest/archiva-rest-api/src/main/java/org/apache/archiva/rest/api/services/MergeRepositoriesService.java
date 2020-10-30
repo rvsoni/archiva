@@ -18,6 +18,7 @@ package org.apache.archiva.rest.api.services;
  * under the License.
  */
 
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.apache.archiva.maven2.model.Artifact;
 import org.apache.archiva.redback.authorization.RedbackAuthorization;
 import org.apache.archiva.security.common.ArchivaRoleConstants;
@@ -36,6 +37,7 @@ import java.util.List;
  * @since 1.4-M3
  */
 @Path ("/mergeRepositoriesService/")
+@Tag(name="RepositoryMerge", description = "Merging repositories")
 public interface MergeRepositoriesService
 {
 
@@ -46,7 +48,7 @@ public interface MergeRepositoriesService
     @Path ("mergeConflictedArtifacts/{sourceRepositoryId}/{targetRepositoryId}")
     @GET
     @Produces ({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
-    @RedbackAuthorization (permissions = ArchivaRoleConstants.OPERATION_MERGE_REPOSITORY)
+    @RedbackAuthorization (permissions = ArchivaRoleConstants.OPERATION_MERGE_REPOSITORY, resource = "{sourceRepositoryId}")
     List<Artifact> getMergeConflictedArtifacts( @PathParam ("sourceRepositoryId") String sourceRepositoryId,
                                                 @PathParam ("targetRepositoryId") String targetRepositoryId )
         throws ArchivaRestServiceException;
@@ -57,7 +59,7 @@ public interface MergeRepositoriesService
      */
     @Path ("mergeRepositories/{sourceRepositoryId}/{targetRepositoryId}/{skipConflicts}")
     @GET
-    @RedbackAuthorization (permissions = ArchivaRoleConstants.OPERATION_MERGE_REPOSITORY)
+    @RedbackAuthorization (permissions = ArchivaRoleConstants.OPERATION_MERGE_REPOSITORY, resource = "{sourceRepositoryId}")
     void mergeRepositories( @PathParam ("sourceRepositoryId") String sourceRepositoryId,
                             @PathParam ("targetRepositoryId") String targetRepositoryId,
                             @PathParam ("skipConflicts") boolean skipConflicts )

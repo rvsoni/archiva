@@ -21,29 +21,35 @@ package org.apache.archiva.repository.metadata.base;
 
 import org.apache.archiva.checksum.ChecksumAlgorithm;
 import org.apache.archiva.checksum.ChecksummedFile;
-import org.apache.archiva.common.utils.PathUtil;
 import org.apache.archiva.common.utils.VersionComparator;
 import org.apache.archiva.common.utils.VersionUtil;
+import org.apache.archiva.components.registry.Registry;
+import org.apache.archiva.components.registry.RegistryListener;
 import org.apache.archiva.configuration.ArchivaConfiguration;
+import org.apache.archiva.configuration.ConfigurationEvent;
+import org.apache.archiva.configuration.ConfigurationListener;
 import org.apache.archiva.configuration.ConfigurationNames;
 import org.apache.archiva.configuration.FileTypes;
 import org.apache.archiva.configuration.ProxyConnectorConfiguration;
-import org.apache.archiva.maven2.metadata.MavenMetadataReader;
 import org.apache.archiva.model.ArchivaRepositoryMetadata;
-import org.apache.archiva.model.ArtifactReference;
 import org.apache.archiva.model.Plugin;
-import org.apache.archiva.model.ProjectReference;
 import org.apache.archiva.model.SnapshotVersion;
-import org.apache.archiva.model.VersionedReference;
-import org.apache.archiva.components.registry.Registry;
-import org.apache.archiva.components.registry.RegistryListener;
-import org.apache.archiva.repository.ContentNotFoundException;
-import org.apache.archiva.repository.LayoutException;
+import org.apache.archiva.repository.content.BaseRepositoryContentLayout;
+import org.apache.archiva.repository.content.ContentNotFoundException;
+import org.apache.archiva.repository.content.ContentAccessException;
+import org.apache.archiva.repository.content.LayoutException;
 import org.apache.archiva.repository.ManagedRepositoryContent;
 import org.apache.archiva.repository.RemoteRepositoryContent;
+import org.apache.archiva.repository.RepositoryRegistry;
+import org.apache.archiva.repository.RepositoryType;
+import org.apache.archiva.repository.content.Artifact;
+import org.apache.archiva.repository.content.ContentItem;
+import org.apache.archiva.repository.content.ItemSelector;
+import org.apache.archiva.repository.content.Project;
+import org.apache.archiva.repository.content.base.ArchivaItemSelector;
+import org.apache.archiva.repository.metadata.MetadataReader;
 import org.apache.archiva.repository.metadata.RepositoryMetadataException;
 import org.apache.archiva.repository.storage.StorageAsset;
-import org.apache.archiva.xml.XMLException;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.math.NumberUtils;
@@ -55,14 +61,27 @@ import javax.annotation.PostConstruct;
 import javax.inject.Inject;
 import javax.inject.Named;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Calendar;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TimeZone;
 import java.util.regex.Matcher;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
+
+// import org.apache.archiva.maven2.metadata.MavenMetadataReader;
 
 /**
  * MetadataTools
@@ -71,9 +90,9 @@ import java.util.stream.Stream;
  */
 @Service( "metadataTools#default" )
 public class MetadataTools
-    implements RegistryListener
+    implements RegistryListener, ConfigurationListener
 {
-    private Logger log = LoggerFactory.getLogger( getClass() );
+    private static final Logger log = LoggerFactory.getLogger( MetadataTools.class );
 
     public static final String MAVEN_METADATA = "maven-metadata.xml";
 
@@ -82,6 +101,9 @@ public class MetadataTools
     private static final char PATH_SEPARATOR = '/';
 
     private static final char GROUP_SEPARATOR = '.';
+
+    @Inject
+    private RepositoryRegistry repositoryRegistry;
 
     /**
      *
@@ -136,10 +158,29 @@ public class MetadataTools
      * @throws ContentNotFoundException
      */
     public Set<String> gatherSnapshotVersions( ManagedRepositoryContent managedRepository,
-                                               VersionedReference reference )
+                                               ItemSelector reference )
         throws LayoutException, IOException, ContentNotFoundException
     {
-        Set<String> foundVersions = managedRepository.getVersions( reference );
+        Set<String> foundVersions = null;
+        try
+        {
+            ArchivaItemSelector selector = ArchivaItemSelector.builder( )
+                .withNamespace( reference.getNamespace() )
+                .withProjectId( reference.getArtifactId( ) )
+                .withArtifactId( reference.getArtifactId( ) )
+                .withVersion( reference.getVersion( ) )
+                .build( );
+            try(Stream<? extends Artifact> stream = managedRepository.getLayout( BaseRepositoryContentLayout.class ).newArtifactStream( selector )) {
+                foundVersions = stream.map( a -> a.getArtifactVersion( ) )
+                    .filter( StringUtils::isNotEmpty )
+                    .collect( Collectors.toSet( ) );
+            }
+        }
+        catch ( ContentAccessException e )
+        {
+            log.error( "Error while accessing content {}", e.getMessage( ) );
+            throw new IOException( "Could not access repository content: " + e.getMessage( ) );
+        }
 
         // Next gather up the referenced 'latest' versions found in any proxied repositories
         // maven-metadata-${proxyId}.xml files that may be present.
@@ -184,13 +225,14 @@ public class MetadataTools
         return foundVersions;
     }
 
+
     /**
      * Take a path to a maven-metadata.xml, and attempt to translate it to a VersionedReference.
      *
      * @param path
      * @return
      */
-    public VersionedReference toVersionedReference( String path )
+    public ItemSelector toVersionedSelector( String path )
         throws RepositoryMetadataException
     {
         if ( !path.endsWith( "/" + MAVEN_METADATA ) )
@@ -198,7 +240,7 @@ public class MetadataTools
             throw new RepositoryMetadataException( "Cannot convert to versioned reference, not a metadata file. " );
         }
 
-        VersionedReference reference = new VersionedReference();
+        ArchivaItemSelector.Builder builder = ArchivaItemSelector.builder( );
 
         String normalizedPath = StringUtils.replace( path, "\\", "/" );
         String pathParts[] = StringUtils.split( normalizedPath, '/' );
@@ -207,16 +249,17 @@ public class MetadataTools
         int artifactIdOffset = versionOffset - 1;
         int groupIdEnd = artifactIdOffset - 1;
 
-        reference.setVersion( pathParts[versionOffset] );
+        builder.withVersion(  pathParts[versionOffset] );
 
-        if ( !hasNumberAnywhere( reference.getVersion() ) )
+        if ( !hasNumberAnywhere( pathParts[versionOffset] ) )
         {
             // Scary check, but without it, all paths are version references;
             throw new RepositoryMetadataException(
                 "Not a versioned reference, as version id on path has no number in it." );
         }
 
-        reference.setArtifactId( pathParts[artifactIdOffset] );
+        builder.withArtifactId( pathParts[artifactIdOffset] );
+        builder.withProjectId( pathParts[artifactIdOffset] );
 
         StringBuilder gid = new StringBuilder();
         for ( int i = 0; i <= groupIdEnd; i++ )
@@ -228,9 +271,9 @@ public class MetadataTools
             gid.append( pathParts[i] );
         }
 
-        reference.setGroupId( gid.toString() );
+        builder.withNamespace( gid.toString( ) );
 
-        return reference;
+        return builder.build();
     }
 
     private boolean hasNumberAnywhere( String version )
@@ -238,7 +281,7 @@ public class MetadataTools
         return StringUtils.indexOfAny( version, NUMS ) != ( -1 );
     }
 
-    public ProjectReference toProjectReference( String path )
+    public ItemSelector toProjectSelector( String path )
         throws RepositoryMetadataException
     {
         if ( !path.endsWith( "/" + MAVEN_METADATA ) )
@@ -246,7 +289,7 @@ public class MetadataTools
             throw new RepositoryMetadataException( "Cannot convert to versioned reference, not a metadata file. " );
         }
 
-        ProjectReference reference = new ProjectReference();
+        ArchivaItemSelector.Builder builder = ArchivaItemSelector.builder( );
 
         String normalizedPath = StringUtils.replace( path, "\\", "/" );
         String pathParts[] = StringUtils.split( normalizedPath, '/' );
@@ -256,7 +299,8 @@ public class MetadataTools
         int artifactIdOffset = pathParts.length - 2;
         int groupIdEnd = artifactIdOffset - 1;
 
-        reference.setArtifactId( pathParts[artifactIdOffset] );
+        builder.withArtifactId( pathParts[artifactIdOffset] );
+        builder.withProjectId( pathParts[artifactIdOffset] );
 
         StringBuilder gid = new StringBuilder();
         for ( int i = 0; i <= groupIdEnd; i++ )
@@ -268,39 +312,30 @@ public class MetadataTools
             gid.append( pathParts[i] );
         }
 
-        reference.setGroupId( gid.toString() );
-
-        return reference;
+        builder.withNamespace( gid.toString( ) );
+        return builder.build();
     }
 
+    public String toPath( ContentItem reference )
+    {
 
+        return reference.getAsset().resolve( MAVEN_METADATA ).getPath();
 
-    public String toPath( ProjectReference reference )
+    }
+
+    public String toPath( ItemSelector reference )
     {
         StringBuilder path = new StringBuilder();
 
-        path.append( formatAsDirectory( reference.getGroupId() ) ).append( PATH_SEPARATOR );
-        path.append( reference.getArtifactId() ).append( PATH_SEPARATOR );
-        path.append( MAVEN_METADATA );
-
-        return path.toString();
-    }
-
-    public String toPath( VersionedReference reference )
-    {
-        StringBuilder path = new StringBuilder();
-
-        path.append( formatAsDirectory( reference.getGroupId() ) ).append( PATH_SEPARATOR );
-        path.append( reference.getArtifactId() ).append( PATH_SEPARATOR );
-        if ( reference.getVersion() != null )
-        {
-            // add the version only if it is present
-            path.append( VersionUtil.getBaseVersion( reference.getVersion() ) ).append( PATH_SEPARATOR );
+        path.append( formatAsDirectory( reference.getNamespace() ) ).append( PATH_SEPARATOR );
+        path.append( reference.getProjectId() ).append( PATH_SEPARATOR );
+        if (reference.hasVersion()) {
+            path.append( reference.getVersion( ) ).append( PATH_SEPARATOR );
         }
         path.append( MAVEN_METADATA );
-
-        return path.toString();
+        return path.toString( );
     }
+
 
     private String formatAsDirectory( String directory )
     {
@@ -351,31 +386,16 @@ public class MetadataTools
         initConfigVariables();
 
         configuration.addChangeListener( this );
+        configuration.addListener( this );
     }
 
     public ArchivaRepositoryMetadata readProxyMetadata( ManagedRepositoryContent managedRepository,
-                                                        ProjectReference reference, String proxyId )
+                                                        ItemSelector reference, String proxyId )
     {
         String metadataPath = getRepositorySpecificName( proxyId, toPath( reference ) );
         StorageAsset metadataFile = managedRepository.getRepository().getAsset( metadataPath );
 
-        if ( !metadataFile.exists() || metadataFile.isContainer())
-        {
-            // Nothing to do. return null.
-            return null;
-        }
-
-        try
-        {
-            return MavenMetadataReader.read( metadataFile );
-        }
-        catch (XMLException | IOException e )
-        {
-            // TODO: [monitor] consider a monitor for this event.
-            // TODO: consider a read-redo on monitor return code?
-            log.warn( "Unable to read metadata: {}", metadataFile.getPath(), e );
-            return null;
-        }
+        return readMetadataFile( managedRepository, metadataFile );
     }
 
     public ArchivaRepositoryMetadata readProxyMetadata( ManagedRepositoryContent managedRepository,
@@ -383,49 +403,7 @@ public class MetadataTools
     {
         String metadataPath = getRepositorySpecificName( proxyId, logicalResource );
         StorageAsset metadataFile = managedRepository.getRepository().getAsset( metadataPath );
-
-        if ( !metadataFile.exists() || metadataFile.isContainer())
-        {
-            // Nothing to do. return null.
-            return null;
-        }
-
-        try
-        {
-            return MavenMetadataReader.read( metadataFile );
-        }
-        catch (XMLException | IOException e )
-        {
-            // TODO: [monitor] consider a monitor for this event.
-            // TODO: consider a read-redo on monitor return code?
-            log.warn( "Unable to read metadata: {}", metadataFile.getPath(), e );
-            return null;
-        }
-    }
-
-    public ArchivaRepositoryMetadata readProxyMetadata( ManagedRepositoryContent managedRepository,
-                                                        VersionedReference reference, String proxyId )
-    {
-        String metadataPath = getRepositorySpecificName( proxyId, toPath( reference ) );
-        StorageAsset metadataFile = managedRepository.getRepository().getAsset( metadataPath );
-
-        if ( !metadataFile.exists() || metadataFile.isContainer())
-        {
-            // Nothing to do. return null.
-            return null;
-        }
-
-        try
-        {
-            return MavenMetadataReader.read( metadataFile );
-        }
-        catch (XMLException | IOException e )
-        {
-            // TODO: [monitor] consider a monitor for this event.
-            // TODO: consider a read-redo on monitor return code?
-            log.warn( "Unable to read metadata: {}", metadataFile.getPath(), e );
-            return null;
-        }
+        return readMetadataFile( managedRepository, metadataFile );
     }
 
     public void updateMetadata( ManagedRepositoryContent managedRepository, String logicalResource )
@@ -501,22 +479,10 @@ public class MetadataTools
 
         if ( file.exists() )
         {
-            try
+            ArchivaRepositoryMetadata existingMetadata = readMetadataFile( managedRepository, file );
+            if ( existingMetadata != null )
             {
-                ArchivaRepositoryMetadata existingMetadata = MavenMetadataReader.read( file );
-                if ( existingMetadata != null )
-                {
-                    metadatas.add( existingMetadata );
-                }
-            }
-            catch (XMLException | IOException e )
-            {
-                log.debug( "Could not read metadata at {}. Metadata will be removed.", file.getPath() );
-                try {
-                    file.getStorage().removeAsset(file);
-                } catch (IOException ex) {
-                    log.error("Could not remove asset {}", file.getPath());
-                }
+                metadatas.add( existingMetadata );
             }
         }
 
@@ -555,35 +521,45 @@ public class MetadataTools
      * @throws ContentNotFoundException
      * @deprecated
      */
-    public void updateMetadata( ManagedRepositoryContent managedRepository, ProjectReference reference )
+    public void updateProjectMetadata( ManagedRepositoryContent managedRepository, ItemSelector reference )
         throws LayoutException, RepositoryMetadataException, IOException, ContentNotFoundException
     {
 
         StorageAsset metadataFile = managedRepository.getRepository().getAsset( toPath( reference ) );
+        ArchivaRepositoryMetadata existingMetadata = readMetadataFile( managedRepository, metadataFile );
+        BaseRepositoryContentLayout layout = managedRepository.getLayout( BaseRepositoryContentLayout.class );
 
-        long lastUpdated = getExistingLastUpdated( metadataFile );
+        long lastUpdated = getExistingLastUpdated( existingMetadata );
 
         ArchivaRepositoryMetadata metadata = new ArchivaRepositoryMetadata();
-        metadata.setGroupId( reference.getGroupId() );
-        metadata.setArtifactId( reference.getArtifactId() );
+        metadata.setGroupId( reference.getNamespace() );
+        metadata.setArtifactId( reference.getProjectId() );
 
         // Gather up all versions found in the managed repository.
-        Set<String> allVersions = managedRepository.getVersions( reference );
+        ItemSelector selector = ArchivaItemSelector.builder( )
+            .withNamespace( reference.getNamespace() )
+            .withProjectId( reference.getProjectId( ) )
+            .build();
+        Set<String> allVersions = null;
+        try
+        {
+            Project project = layout.getProject( selector );
+            allVersions = layout.getVersions( project ).stream()
+            .map( v -> v.getId() ).collect( Collectors.toSet());
+        }
+        catch ( ContentAccessException e )
+        {
+            log.error( "Error while accessing repository: {}", e.getMessage( ), e );
+            throw new RepositoryMetadataException( "Error while accessing repository " + e.getMessage( ), e );
+        }
 
         // Gather up all plugins found in the managed repository.
         // TODO: do we know this information instead?
 //        Set<Plugin> allPlugins = managedRepository.getPlugins( reference );
         Set<Plugin> allPlugins;
-        if ( metadataFile.exists())
+        if ( existingMetadata!=null)
         {
-            try
-            {
-                allPlugins = new LinkedHashSet<Plugin>( MavenMetadataReader.read( metadataFile ).getPlugins() );
-            }
-            catch ( XMLException e )
-            {
-                throw new RepositoryMetadataException( e.getMessage(), e );
-            }
+            allPlugins = new LinkedHashSet<Plugin>( existingMetadata.getPlugins() );
         }
         else
         {
@@ -636,6 +612,16 @@ public class MetadataTools
         RepositoryMetadataWriter.write( metadata, metadataFile );
         ChecksummedFile checksum = new ChecksummedFile( metadataFile.getFilePath() );
         checksum.fixChecksums( algorithms );
+    }
+
+    public MetadataReader getMetadataReader( ManagedRepositoryContent managedRepository )
+    {
+        if (managedRepository!=null)
+        {
+            return repositoryRegistry.getMetadataReader( managedRepository.getRepository( ).getType( ) );
+        } else {
+            return repositoryRegistry.getMetadataReader( RepositoryType.MAVEN );
+        }
     }
 
     private void updateMetadataVersions( Collection<String> allVersions, ArchivaRepositoryMetadata metadata )
@@ -729,25 +715,34 @@ public class MetadataTools
         }
     }
 
-    private long getExistingLastUpdated( StorageAsset metadataFile )
+    ArchivaRepositoryMetadata readMetadataFile( ManagedRepositoryContent repository, StorageAsset asset) {
+        MetadataReader reader = getMetadataReader( repository );
+        try
+        {
+            if (asset.exists() && !asset.isContainer())
+            {
+                return reader.read( asset );
+            } else {
+                log.error( "Trying to read metadata from container: {}", asset.getPath( ) );
+                return null;
+            }
+        }
+        catch ( RepositoryMetadataException e )
+        {
+            log.error( "Could not read metadata file {}", asset, e );
+            return null;
+        }
+    }
+
+    private long getExistingLastUpdated( ArchivaRepositoryMetadata metadata )
     {
-        if ( !metadataFile.exists() )
+        if ( metadata==null )
         {
             // Doesn't exist.
             return 0;
         }
 
-        try
-        {
-            ArchivaRepositoryMetadata metadata = MavenMetadataReader.read( metadataFile );
-
-            return getLastUpdated( metadata );
-        }
-        catch (XMLException | IOException e )
-        {
-            // Error.
-            return 0;
-        }
+        return getLastUpdated( metadata );
     }
 
     /**
@@ -766,15 +761,16 @@ public class MetadataTools
      * @throws ContentNotFoundException
      * @deprecated
      */
-    public void updateMetadata( ManagedRepositoryContent managedRepository, VersionedReference reference )
+    public void updateVersionMetadata( ManagedRepositoryContent managedRepository, ItemSelector reference )
         throws LayoutException, RepositoryMetadataException, IOException, ContentNotFoundException
     {
         StorageAsset metadataFile = managedRepository.getRepository().getAsset( toPath( reference ) );
+        ArchivaRepositoryMetadata existingMetadata = readMetadataFile(managedRepository, metadataFile );
 
-        long lastUpdated = getExistingLastUpdated( metadataFile );
+        long lastUpdated = getExistingLastUpdated( existingMetadata );
 
         ArchivaRepositoryMetadata metadata = new ArchivaRepositoryMetadata();
-        metadata.setGroupId( reference.getGroupId() );
+        metadata.setGroupId( reference.getNamespace() );
         metadata.setArtifactId( reference.getArtifactId() );
 
         if ( VersionUtil.isSnapshot( reference.getVersion() ) )
@@ -789,7 +785,7 @@ public class MetadataTools
             if ( snapshotVersions.isEmpty() )
             {
                 throw new ContentNotFoundException(
-                    "No snapshot versions found on reference [" + VersionedReference.toKey( reference ) + "]." );
+                    "No snapshot versions found on reference [" + reference  + "]." );
             }
 
             // sort the list to determine to aide in determining the Latest version.
@@ -834,10 +830,10 @@ public class MetadataTools
 
                 /* Disabled due to decision in [MRM-535].
                  * Do not set metadata.lastUpdated to file.lastModified.
-                 * 
-                 * Should this be the last updated timestamp of the file, or in the case of an 
+                 *
+                 * Should this be the last updated timestamp of the file, or in the case of an
                  * archive, the most recent timestamp in the archive?
-                 * 
+                 *
                 ArtifactReference artifact = getFirstArtifact( managedRepository, reference );
 
                 if ( artifact == null )
@@ -912,54 +908,6 @@ public class MetadataTools
         }
     }
 
-    /**
-     * Get the first Artifact found in the provided VersionedReference location.
-     *
-     * @param managedRepository the repository to search within.
-     * @param reference         the reference to the versioned reference to search within
-     * @return the ArtifactReference to the first artifact located within the versioned reference. or null if
-     *         no artifact was found within the versioned reference.
-     * @throws IOException     if the versioned reference is invalid (example: doesn't exist, or isn't a directory)
-     * @throws LayoutException
-     */
-    public ArtifactReference getFirstArtifact( ManagedRepositoryContent managedRepository,
-                                               VersionedReference reference )
-        throws LayoutException, IOException
-    {
-        String path = toPath( reference );
-
-        int idx = path.lastIndexOf( '/' );
-        if ( idx > 0 )
-        {
-            path = path.substring( 0, idx );
-        }
-
-        Path repoDir = Paths.get( managedRepository.getRepoRoot(), path );
-
-        if ( !Files.exists(repoDir))
-        {
-            throw new IOException( "Unable to gather the list of snapshot versions on a non-existant directory: "
-                                       + repoDir.toAbsolutePath() );
-        }
-
-        if ( !Files.isDirectory( repoDir ))
-        {
-            throw new IOException(
-                "Unable to gather the list of snapshot versions on a non-directory: " + repoDir.toAbsolutePath() );
-        }
-
-        try(Stream<Path> stream = Files.list(repoDir)) {
-            String result = stream.filter(  Files::isRegularFile ).map( path1 ->
-                PathUtil.getRelative( managedRepository.getRepoRoot(), path1 )
-            ).filter( filetypes::matchesArtifactPattern ).findFirst().orElse( null );
-            if (result!=null) {
-                return managedRepository.toArtifactReference( result );
-            }
-        }
-        // No artifact was found.
-        return null;
-    }
-
     public ArchivaConfiguration getConfiguration()
     {
         return configuration;
@@ -979,4 +927,12 @@ public class MetadataTools
     {
         this.filetypes = filetypes;
     }
+
+    @Override
+    public void configurationEvent( ConfigurationEvent event )
+    {
+        log.debug( "Configuration event {}", event );
+    }
+
+
 }

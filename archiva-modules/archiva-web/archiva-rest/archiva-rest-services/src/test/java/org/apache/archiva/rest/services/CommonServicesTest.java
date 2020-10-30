@@ -32,7 +32,7 @@ public class CommonServicesTest
         throws Exception
     {
         CommonServices commonServices = getCommonServices( null );
-        assertTrue( commonServices.validateCronExpression( "0 0,30 * * * ?" ) );
+        assertTrue( commonServices.validateCronExpression( "0 0,30 * * * ?" ).isValid() );
     }
 
     @Test
@@ -40,6 +40,6 @@ public class CommonServicesTest
         throws Exception
     {
         CommonServices commonServices = getCommonServices( null );
-        assertFalse( commonServices.validateCronExpression( "0,30 * * * ?" ) );
+        assertFalse( commonServices.validateCronExpression( "0,30 * * * ?" ).isValid() );
     }
 }

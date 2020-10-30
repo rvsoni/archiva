@@ -25,12 +25,12 @@ import org.apache.archiva.metadata.repository.MetadataRepository;
 import org.apache.archiva.metadata.repository.RepositorySession;
 import org.apache.archiva.filter.Filter;
 import org.apache.archiva.metadata.repository.storage.*;
-import org.apache.archiva.model.ArtifactReference;
 import org.apache.archiva.policies.ProxyDownloadException;
 import org.apache.archiva.components.taskqueue.TaskQueueException;
-import org.apache.archiva.repository.ManagedRepository;
 import org.apache.archiva.repository.ManagedRepositoryContent;
+import org.apache.archiva.repository.ManagedRepository;
 import org.apache.archiva.metadata.audit.RepositoryListener;
+import org.apache.archiva.repository.content.ItemSelector;
 import org.apache.archiva.scheduler.repository.model.RepositoryArchivaTaskScheduler;
 import org.apache.archiva.scheduler.repository.model.RepositoryTask;
 import org.apache.archiva.xml.XMLException;
@@ -102,10 +102,9 @@ public class MockBeanServices
     }
 
     @Override
-    public void applyServerSideRelocation( ManagedRepository managedRepository, ArtifactReference artifact )
-        throws ProxyDownloadException
+    public ItemSelector applyServerSideRelocation( ManagedRepository managedRepository, ItemSelector selector ) throws ProxyDownloadException
     {
-
+        return null;
     }
 
 

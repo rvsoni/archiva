@@ -37,29 +37,23 @@
     <dependency>
       <groupId>org.apache.archiva</groupId>
       <artifactId>archiva-security-common</artifactId>
-
     </dependency>
-
     <dependency>
       <groupId>org.apache.archiva</groupId>
       <artifactId>archiva-repository-admin-api</artifactId>
     </dependency>
-
     <dependency>
       <groupId>org.apache.archiva</groupId>
       <artifactId>archiva-policies</artifactId>
     </dependency>
-
     <dependency>
       <groupId>org.apache.archiva</groupId>
       <artifactId>metadata-model</artifactId>
     </dependency>
-
     <dependency>
       <groupId>org.apache.archiva.maven</groupId>
       <artifactId>archiva-maven-model</artifactId>
     </dependency>
-
     <dependency>
       <groupId>org.apache.archiva</groupId>
       <artifactId>archiva-repository-scanner</artifactId>
@@ -67,14 +61,8 @@
 
     <dependency>
       <groupId>org.apache.archiva</groupId>
-      <artifactId>repository-statistics</artifactId>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.archiva</groupId>
       <artifactId>metadata-statistics-api</artifactId>
     </dependency>
-
     <dependency>
       <groupId>org.apache.archiva.redback</groupId>
       <artifactId>redback-authorization-api</artifactId>
@@ -86,13 +74,12 @@
       </exclusions>
     </dependency>
     <dependency>
-      <groupId>javax.ws.rs</groupId>
-      <artifactId>javax.ws.rs-api</artifactId>
+      <groupId>jakarta.ws.rs</groupId>
+      <artifactId>jakarta.ws.rs-api</artifactId>
     </dependency>
-    <!-- normally not needed but here for wadl feature currently in cxf -->
     <dependency>
-      <groupId>org.apache.cxf</groupId>
-      <artifactId>cxf-rt-frontend-jaxrs</artifactId>
+      <groupId>jakarta.annotation</groupId>
+      <artifactId>jakarta.annotation-api</artifactId>
     </dependency>
 
   </dependencies>
@@ -100,18 +87,16 @@
   <build>
     <plugins>
       <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-source-plugin</artifactId>
-        <executions>
-          <execution>
-            <id>bind-sources</id>
-            <goals>
-              <goal>jar-no-fork</goal>
-            </goals>
-          </execution>
-        </executions>
+        <groupId>org.apache.rat</groupId>
+        <artifactId>apache-rat-plugin</artifactId>
+        <configuration>
+          <excludes>
+            <exclude>target/generated</exclude>
+            <exclude>src/main/resources/templates/*</exclude>
+            <exclude>src/main/resources/openapi-codegen-ignore</exclude>
+          </excludes>
+        </configuration>
       </plugin>
-
     </plugins>
   </build>
 
@@ -128,10 +113,8 @@
       </activation>
       <dependencies>
         <dependency>
-          <groupId>javax.xml.bind</groupId>
-          <artifactId>jaxb-api</artifactId>
-          <version>2.3.0</version>
-          <scope>provided</scope>
+          <groupId>jakarta.xml.bind</groupId>
+      <artifactId>jakarta.xml.bind-api</artifactId>
         </dependency>
       </dependencies>
     </profile>

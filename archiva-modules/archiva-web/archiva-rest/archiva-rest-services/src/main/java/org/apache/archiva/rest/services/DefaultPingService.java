@@ -19,6 +19,7 @@ package org.apache.archiva.rest.services;
  * under the License.
  */
 
+import org.apache.archiva.rest.api.model.PingResult;
 import org.apache.archiva.rest.api.services.PingService;
 import org.springframework.stereotype.Service;
 
@@ -31,13 +32,13 @@ public class DefaultPingService
     implements PingService
 {
     @Override
-    public String ping()
+    public PingResult ping()
     {
-        return "Yeah Baby It rocks!";
+        return new PingResult( "Yeah Baby It rocks!" );
     }
 
     @Override
-    public String pingWithAuthz()
+    public PingResult pingWithAuthz()
     {
         return ping();
     }

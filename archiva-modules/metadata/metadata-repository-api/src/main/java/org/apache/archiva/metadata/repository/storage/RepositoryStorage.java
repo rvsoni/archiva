@@ -19,14 +19,14 @@ package org.apache.archiva.metadata.repository.storage;
  * under the License.
  */
 
+import org.apache.archiva.filter.Filter;
 import org.apache.archiva.metadata.model.ArtifactMetadata;
 import org.apache.archiva.metadata.model.ProjectMetadata;
 import org.apache.archiva.metadata.model.ProjectVersionMetadata;
-import org.apache.archiva.filter.Filter;
-import org.apache.archiva.model.ArtifactReference;
 import org.apache.archiva.policies.ProxyDownloadException;
 import org.apache.archiva.repository.ManagedRepository;
 import org.apache.archiva.repository.ManagedRepositoryContent;
+import org.apache.archiva.repository.content.ItemSelector;
 import org.apache.archiva.xml.XMLException;
 
 import java.io.IOException;
@@ -59,7 +59,7 @@ public interface RepositoryStorage
     // FIXME: reconsider this API, do we want to expose storage format in the form of a path?
     ArtifactMetadata readArtifactMetadataFromPath( String repoId, String path )
         throws RepositoryStorageRuntimeException;
-    
+
     /**
      * A relocation capable client will request the POM prior to the artifact, and will then read meta-data and do
      * client side relocation. A simplier client (like maven 1) will only request the artifact and not use the
@@ -68,11 +68,12 @@ public interface RepositoryStorage
      * For such clients, archiva does server-side relocation by reading itself the &lt;relocation&gt; element in
      * metadatas and serving the expected artifact.
      * @param managedRepository the used managed repository
-     * @param artifact the artifact reference
+     * @param selector the artifact reference
      * @throws org.apache.archiva.policies.ProxyDownloadException
-     */    
-    void applyServerSideRelocation( ManagedRepository managedRepository, ArtifactReference artifact )
+     */
+    ItemSelector applyServerSideRelocation( ManagedRepository managedRepository, ItemSelector selector )
         throws ProxyDownloadException;
+
 
     /**
      * add an other method to evaluate real path as when receiving -SNAPSHOT (for maven storage)

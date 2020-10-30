@@ -19,22 +19,23 @@ package $package;
  * under the License.
  */
 
+import org.apache.archiva.components.registry.Registry;
+import org.apache.archiva.components.registry.RegistryListener;
 import org.apache.archiva.configuration.ArchivaConfiguration;
 import org.apache.archiva.configuration.FileTypes;
 import org.apache.archiva.consumers.AbstractMonitoredConsumer;
 import org.apache.archiva.consumers.ConsumerException;
 import org.apache.archiva.consumers.KnownRepositoryContentConsumer;
-import org.apache.archiva.metadata.repository.MetadataResolutionException;
 import org.apache.archiva.metadata.repository.MetadataRepositoryException;
+import org.apache.archiva.metadata.repository.MetadataResolutionException;
 import org.apache.archiva.metadata.repository.RepositorySession;
 import org.apache.archiva.metadata.repository.RepositorySessionFactory;
-import org.apache.archiva.model.ArtifactReference;
-import org.apache.archiva.components.registry.Registry;
-import org.apache.archiva.components.registry.RegistryListener;
-import org.apache.archiva.repository.LayoutException;
+import org.apache.archiva.repository.content.BaseRepositoryContentLayout;
+import org.apache.archiva.repository.content.LayoutException;
 import org.apache.archiva.repository.ManagedRepository;
 import org.apache.archiva.repository.ManagedRepositoryContent;
 import org.apache.archiva.repository.RepositoryContentFactory;
+import org.apache.archiva.repository.content.Artifact;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Scope;
@@ -124,10 +125,10 @@ public class SimpleArtifactConsumer
         try
         {
             ManagedRepositoryContent repositoryContent = repository.getContent();
-            ArtifactReference artifact = repositoryContent.toArtifactReference( path );
-
-            repositorySession.getRepository().getArtifacts( repositorySession, repository.getId(), artifact.getGroupId(),
-                                                            artifact.getArtifactId(), artifact.getVersion() );
+            BaseRepositoryContentLayout layout = repositoryContent.getLayout( BaseRepositoryContentLayout.class );
+            Artifact artifact = layout.getArtifact( path );
+            repositorySession.getRepository().getArtifacts( repositorySession, repository.getId(), artifact.getNamespace().getId(),
+                                                            artifact.getId(), artifact.getVersion().getId() );
         }
         catch ( LayoutException | MetadataResolutionException  e )
         {

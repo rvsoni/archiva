@@ -19,9 +19,6 @@ package org.apache.archiva.repository;
  * under the License.
  */
 
-import org.apache.archiva.model.ArtifactReference;
-import org.apache.archiva.model.RepositoryURL;
-
 /**
  * RemoteRepositoryContent interface for interacting with a remote repository in an abstract way, 
  * without the need for processing based on URLs, or working with the database. 
@@ -52,19 +49,6 @@ public interface RemoteRepositoryContent extends RepositoryContent
     RemoteRepository getRepository();
 
     /**
-     * <p>
-     * Convenience method to get the repository url.
-     * </p>
-     * 
-     * <p>
-     * Equivalent to calling <code>new RepositoryURL( this.getRepository().getUrl() )</code>
-     * </p>
-     * 
-     * @return the repository url.
-     */
-    RepositoryURL getURL();
-
-    /**
      * Set the repository configuration to associate with this
      * repository content.
      * 
@@ -72,11 +56,4 @@ public interface RemoteRepositoryContent extends RepositoryContent
      */
     void setRepository( RemoteRepository repo );
 
-    /**
-     * Given an ArtifactReference, return the url to the artifact.
-     *
-     * @param reference the artifact reference to use.
-     * @return the relative path to the artifact.
-     */
-    RepositoryURL toURL( ArtifactReference reference );
 }

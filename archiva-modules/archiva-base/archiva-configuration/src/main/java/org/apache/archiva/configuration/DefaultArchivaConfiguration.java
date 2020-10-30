@@ -35,7 +35,6 @@ import org.apache.archiva.components.registry.RegistryListener;
 import org.apache.archiva.components.registry.commons.CommonsConfigurationRegistry;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.ListUtils;
-import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
@@ -47,6 +46,7 @@ import javax.inject.Inject;
 import javax.inject.Named;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
@@ -522,7 +522,7 @@ public class DefaultArchivaConfiguration
         contents = "<configuration><xml fileName=\"" + fileLocation
                 + "\" config-forceCreate=\"true\" config-name=\"org.apache.archiva.user\"/>" + "</configuration>";
 
-        ((CommonsConfigurationRegistry) registry).setProperties(contents);
+        ((CommonsConfigurationRegistry) registry).setInitialConfiguration(contents);
 
         registry.initialize();
 
@@ -533,7 +533,11 @@ public class DefaultArchivaConfiguration
         triggerEvent(ConfigurationEvent.SAVED);
 
         Registry section = registry.getSection(KEY + ".user");
-        return section == null ? new CommonsConfigurationRegistry(new BaseConfiguration()) : section;
+        if (section == null) {
+            return new CommonsConfigurationRegistry( );
+        } else {
+            return section;
+        }
     }
 
     private boolean writeFile(String filetype, String path, String contents) {
@@ -550,10 +554,9 @@ public class DefaultArchivaConfiguration
      * @param contents the contents to write.
      * @return true if write successful.
      */
-    private boolean writeFile(String filetype, String path, String contents, boolean createDirs) {
-        Path file = Paths.get(path);
-
+    private boolean writeFile(String filetype, String path, String contents, boolean createDirs) {                
         try {
+            Path file = Paths.get(path);
             // Check parent directory (if it is declared)
             final Path parent = file.getParent();
             if (parent != null) {
@@ -570,6 +573,9 @@ public class DefaultArchivaConfiguration
             return true;
         } catch (IOException e) {
             log.error("Unable to create {} file: {}", filetype, e.getMessage(), e);
+            return false;
+        } catch (InvalidPathException ipe) {
+            log.error("Unable to read {} file: {}", path, ipe.getMessage(), ipe);
             return false;
         }
     }
@@ -796,9 +802,9 @@ public class DefaultArchivaConfiguration
 
     @Override
     public synchronized void afterConfigurationChange(Registry registry, String propertyName, Object propertyValue) {
-        configuration = null;
-        this.dataDirectory = null;
-        this.repositoryBaseDirectory = null;
+        // configuration = null;
+        // this.dataDirectory = null;
+        // this.repositoryBaseDirectory = null;
     }
 
     private String removeExpressions(String directory) {

@@ -21,6 +21,8 @@ package org.apache.archiva.rest.services;
 import org.apache.archiva.components.scheduler.CronExpressionValidator;
 import org.apache.archiva.redback.rest.api.services.RedbackServiceException;
 import org.apache.archiva.redback.rest.api.services.UtilServices;
+import org.apache.archiva.rest.api.model.ActionStatus;
+import org.apache.archiva.rest.api.model.ValidationStatus;
 import org.apache.archiva.rest.api.services.ArchivaRestServiceException;
 import org.apache.archiva.rest.api.services.CommonServices;
 import org.apache.commons.lang3.StringUtils;
@@ -30,6 +32,7 @@ import org.springframework.stereotype.Service;
 
 import javax.annotation.PostConstruct;
 import javax.inject.Inject;
+import javax.validation.Valid;
 import javax.ws.rs.core.Response;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -37,6 +40,7 @@ import java.io.InputStream;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 /**
  * @author Olivier Lamy
@@ -53,7 +57,7 @@ public class DefaultCommonServices
     @Inject
     private UtilServices utilServices;
 
-    private Map<String, String> cachei18n = new ConcurrentHashMap<String, String>();
+    private Map<String, Map<String,String>> cachei18n = new ConcurrentHashMap<String, Map<String,String>>();
 
     @Inject
     protected CronExpressionValidator cronExpressionValidator;
@@ -69,7 +73,7 @@ public class DefaultCommonServices
     }
 
     @Override
-    public String getI18nResources( String locale )
+    public Map<String,String> getI18nResources( String locale )
         throws ArchivaRestServiceException
     {
         Properties properties = new Properties();
@@ -86,7 +90,14 @@ public class DefaultCommonServices
             log.warn( "skip error loading properties {}", resourceName );
         }
 
-        return fromProperties( properties );
+        return properties.entrySet().stream().collect(
+            Collectors.toMap(
+                e -> e.getKey().toString(),
+                e -> e.getValue().toString()
+            )
+        );
+
+
     }
 
     private void loadResource( Properties properties, StringBuilder resourceName, String locale )
@@ -139,11 +150,11 @@ public class DefaultCommonServices
     }
 
     @Override
-    public String getAllI18nResources( String locale )
+    public Map<String,String> getAllI18nResources( String locale )
         throws ArchivaRestServiceException
     {
 
-        String cachedi18n = cachei18n.get( StringUtils.isEmpty( locale ) ? "en" : StringUtils.lowerCase( locale ) );
+        Map<String,String> cachedi18n = cachei18n.get( StringUtils.isEmpty( locale ) ? "en" : StringUtils.lowerCase( locale ) );
         if ( cachedi18n != null )
         {
             return cachedi18n;
@@ -155,10 +166,14 @@ public class DefaultCommonServices
             Properties all = utilServices.getI18nProperties( locale );
             StringBuilder resourceName = new StringBuilder( RESOURCE_NAME );
             loadResource( all, resourceName, locale );
-
-            String i18n = fromProperties( all );
-            cachei18n.put( StringUtils.isEmpty( locale ) ? "en" : StringUtils.lowerCase( locale ), i18n );
-            return i18n;
+            Map<String, String> allMap = all.entrySet().stream().collect(
+            Collectors.toMap(
+                e -> e.getKey().toString(),
+                e -> e.getValue().toString()
+            )
+            );
+            cachei18n.put( StringUtils.isEmpty( locale ) ? "en" : StringUtils.lowerCase( locale ), allMap );
+            return allMap;
         }
         catch ( IOException e )
         {
@@ -187,9 +202,9 @@ public class DefaultCommonServices
 
 
     @Override
-    public Boolean validateCronExpression( String cronExpression )
+    public ValidationStatus validateCronExpression( String cronExpression )
         throws ArchivaRestServiceException
     {
-        return cronExpressionValidator.validate( cronExpression );
+        return new ValidationStatus(cronExpressionValidator.validate( cronExpression ));
     }
 }

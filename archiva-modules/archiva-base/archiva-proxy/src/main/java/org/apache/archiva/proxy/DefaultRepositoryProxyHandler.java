@@ -22,11 +22,11 @@ package org.apache.archiva.proxy;
 import org.apache.archiva.checksum.ChecksumAlgorithm;
 import org.apache.archiva.checksum.ChecksumUtil;
 import org.apache.archiva.common.filelock.FileLockManager;
+import org.apache.archiva.common.utils.PathUtil;
+import org.apache.archiva.components.taskqueue.TaskQueueException;
 import org.apache.archiva.configuration.ArchivaConfiguration;
 import org.apache.archiva.configuration.ProxyConnectorConfiguration;
 import org.apache.archiva.configuration.ProxyConnectorRuleConfiguration;
-import org.apache.archiva.model.ArtifactReference;
-import org.apache.archiva.model.Keys;
 import org.apache.archiva.policies.DownloadErrorPolicy;
 import org.apache.archiva.policies.DownloadPolicy;
 import org.apache.archiva.policies.Policy;
@@ -41,23 +41,22 @@ import org.apache.archiva.proxy.model.NetworkProxy;
 import org.apache.archiva.proxy.model.ProxyConnector;
 import org.apache.archiva.proxy.model.ProxyFetchResult;
 import org.apache.archiva.proxy.model.RepositoryProxyHandler;
-import org.apache.archiva.components.taskqueue.TaskQueueException;
 import org.apache.archiva.repository.ManagedRepository;
 import org.apache.archiva.repository.RemoteRepository;
 import org.apache.archiva.repository.RemoteRepositoryContent;
 import org.apache.archiva.repository.RepositoryType;
-import org.apache.archiva.repository.metadata.base.MetadataTools;
+import org.apache.archiva.repository.content.Artifact;
+import org.apache.archiva.repository.content.ContentItem;
+import org.apache.archiva.repository.content.ItemSelector;
 import org.apache.archiva.repository.metadata.RepositoryMetadataException;
-import org.apache.archiva.repository.storage.FilesystemStorage;
+import org.apache.archiva.repository.metadata.base.MetadataTools;
 import org.apache.archiva.repository.storage.StorageAsset;
-import org.apache.archiva.repository.storage.StorageUtil;
+import org.apache.archiva.repository.storage.fs.FilesystemStorage;
+import org.apache.archiva.repository.storage.fs.FsStorageUtil;
 import org.apache.archiva.scheduler.ArchivaTaskScheduler;
 import org.apache.archiva.scheduler.repository.model.RepositoryTask;
 import org.apache.commons.collections4.CollectionUtils;
-import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.SystemUtils;
-import org.apache.tools.ant.types.selectors.SelectorUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MarkerFactory;
@@ -137,18 +136,18 @@ public abstract class DefaultRepositoryProxyHandler implements RepositoryProxyHa
     }
 
     @Override
-    public StorageAsset fetchFromProxies( ManagedRepository repository, ArtifactReference artifact )
+    public StorageAsset fetchFromProxies( ManagedRepository repository, Artifact artifact )
         throws ProxyDownloadException
     {
-        StorageAsset localFile = toLocalFile( repository, artifact );
+        Map<String, Exception> previousExceptions = new LinkedHashMap<>();
+        StorageAsset localFile = artifact.getAsset( );
 
         Properties requestProperties = new Properties();
         requestProperties.setProperty( "filetype", "artifact" );
-        requestProperties.setProperty( "version", artifact.getVersion() );
+        requestProperties.setProperty( "version", artifact.getVersion().getId() );
         requestProperties.setProperty( "managedRepositoryId", repository.getId() );
 
         List<ProxyConnector> connectors = getProxyConnectors( repository );
-        Map<String, Exception> previousExceptions = new LinkedHashMap<>();
         for ( ProxyConnector connector : connectors )
         {
             if ( !connector.isEnabled() )
@@ -159,19 +158,14 @@ public abstract class DefaultRepositoryProxyHandler implements RepositoryProxyHa
             RemoteRepository targetRepository = connector.getTargetRepository();
             requestProperties.setProperty( "remoteRepositoryId", targetRepository.getId() );
 
-            String targetPath = targetRepository.getContent().toPath( artifact );
-
-            if ( SystemUtils.IS_OS_WINDOWS )
-            {
-                // toPath use system PATH_SEPARATOR so on windows url are \ which doesn't work very well :-)
-                targetPath = FilenameUtils.separatorsToUnix( targetPath );
-            }
-
+            StorageAsset targetFile = targetRepository.getAsset( localFile.getPath( ) );
+            // Removing the leading '/' from the path
+            String targetPath = targetFile.getPath( ).substring( 1 );
             try
             {
                 StorageAsset downloadedFile =
                     transferFile( connector, targetRepository, targetPath, repository, localFile, requestProperties,
-                                  true );
+                        true );
 
                 if ( fileExists(downloadedFile) )
                 {
@@ -181,28 +175,95 @@ public abstract class DefaultRepositoryProxyHandler implements RepositoryProxyHa
             }
             catch ( NotFoundException e )
             {
-                log.debug( "Artifact {} not found on repository \"{}\".", Keys.toKey( artifact ),
-                           targetRepository.getId() );
+                log.debug( "Artifact {} not found on repository \"{}\".", artifact.getId(),
+                    targetRepository.getId() );
             }
             catch ( NotModifiedException e )
             {
-                log.debug( "Artifact {} not updated on repository \"{}\".", Keys.toKey( artifact ),
-                           targetRepository.getId() );
+                log.debug( "Artifact {} not updated on repository \"{}\".", artifact.getId(),
+                    targetRepository.getId() );
             }
             catch ( ProxyException e )
             {
                 validatePolicies( this.downloadErrorPolicies, connector.getPolicies(), requestProperties, artifact,
-                                  targetRepository.getContent(), localFile, e, previousExceptions );
+                    targetRepository.getContent(), localFile, e, previousExceptions );
             }
         }
 
         if ( !previousExceptions.isEmpty() )
         {
             throw new ProxyDownloadException( "Failures occurred downloading from some remote repositories",
-                                              previousExceptions );
+                previousExceptions );
         }
 
-        log.debug( "Exhausted all target repositories, artifact {} not found.", Keys.toKey( artifact ) );
+        log.debug( "Exhausted all target repositories, artifact {} not found.", artifact.getId() );
+
+        return null;
+    }
+
+    @Override
+    public StorageAsset fetchFromProxies( ManagedRepository repository, ItemSelector artifactSelector )
+        throws ProxyDownloadException
+    {
+        Map<String, Exception> previousExceptions = new LinkedHashMap<>();
+        ContentItem item = repository.getContent( ).getItem( artifactSelector );
+        StorageAsset localFile = item.getAsset( );
+
+        Properties requestProperties = new Properties();
+        requestProperties.setProperty( "filetype", "artifact" );
+        requestProperties.setProperty( "version", artifactSelector.getVersion() );
+        requestProperties.setProperty( "managedRepositoryId", repository.getId() );
+
+        List<ProxyConnector> connectors = getProxyConnectors( repository );
+        for ( ProxyConnector connector : connectors )
+        {
+            if ( !connector.isEnabled() )
+            {
+                continue;
+            }
+
+            RemoteRepository targetRepository = connector.getTargetRepository();
+            requestProperties.setProperty( "remoteRepositoryId", targetRepository.getId() );
+
+            StorageAsset targetFile = targetRepository.getAsset( localFile.getPath( ) );
+            // Removing the leading '/' from the path
+            String targetPath = targetFile.getPath( ).substring( 1 );
+            try
+            {
+                StorageAsset downloadedFile =
+                    transferFile( connector, targetRepository, targetPath, repository, localFile, requestProperties,
+                        true );
+
+                if ( fileExists(downloadedFile) )
+                {
+                    log.debug( "Successfully transferred: {}", downloadedFile.getPath() );
+                    return downloadedFile;
+                }
+            }
+            catch ( NotFoundException e )
+            {
+                log.debug( "Artifact {} not found on repository \"{}\".", item,
+                    targetRepository.getId() );
+            }
+            catch ( NotModifiedException e )
+            {
+                log.debug( "Artifact {} not updated on repository \"{}\".", item,
+                    targetRepository.getId() );
+            }
+            catch ( ProxyException e )
+            {
+                validatePolicies( this.downloadErrorPolicies, connector.getPolicies(), requestProperties, item,
+                    targetRepository.getContent(), localFile, e, previousExceptions );
+            }
+        }
+
+        if ( !previousExceptions.isEmpty() )
+        {
+            throw new ProxyDownloadException( "Failures occurred downloading from some remote repositories",
+                previousExceptions );
+        }
+
+        log.debug( "Exhausted all target repositories, artifact {} not found.", item );
 
         return null;
     }
@@ -276,8 +337,14 @@ public abstract class DefaultRepositoryProxyHandler implements RepositoryProxyHa
     }
 
     @Override
-    public ProxyFetchResult fetchMetadataFromProxies( ManagedRepository repository, String logicalPath )
+    public ProxyFetchResult fetchMetadataFromProxies( ManagedRepository repository, String rawLogicalPath )
     {
+        String logicalPath;
+        if (rawLogicalPath.startsWith( "/" )){
+            logicalPath = rawLogicalPath.substring( 1 );
+        } else {
+            logicalPath = rawLogicalPath;
+        }
         StorageAsset localFile = repository.getAsset( logicalPath );
 
         Properties requestProperties = new Properties();
@@ -398,11 +465,6 @@ public abstract class DefaultRepositoryProxyHandler implements RepositoryProxyHa
         }
     }
 
-    private StorageAsset toLocalFile(ManagedRepository repository, ArtifactReference artifact )
-    {
-        return repository.getContent().toFile( artifact );
-    }
-
     /**
      * Simple method to test if the file exists on the local disk.
      *
@@ -458,7 +520,11 @@ public abstract class DefaultRepositoryProxyHandler implements RepositoryProxyHa
         {
             url = url + "/";
         }
-        url = url + remotePath;
+        if (remotePath.startsWith( "/" )) {
+            url = url + remotePath.substring( 1 );
+        } else {
+            url = url + remotePath;
+        }
         requestProperties.setProperty( "url", url );
 
         // Is a whitelist defined?
@@ -639,7 +705,7 @@ public abstract class DefaultRepositoryProxyHandler implements RepositoryProxyHa
     }
 
     private void validatePolicies( Map<String, DownloadErrorPolicy> policies, Map<Policy, PolicyOption> settings,
-                                   Properties request, ArtifactReference artifact, RemoteRepositoryContent content,
+                                   Properties request, ContentItem artifact, RemoteRepositoryContent content,
                                    StorageAsset localFile, Exception exception, Map<String, Exception> previousExceptions )
         throws ProxyDownloadException
     {
@@ -687,7 +753,7 @@ public abstract class DefaultRepositoryProxyHandler implements RepositoryProxyHa
 
         log.warn(
             "Transfer error from repository {} for artifact {} , continuing to next repository. Error message: {}",
-            content.getRepository().getId(), Keys.toKey( artifact ), exception.getMessage() );
+            content.getRepository().getId(), artifact, exception.getMessage() );
         log.debug( "Full stack trace", exception );
     }
 
@@ -724,14 +790,14 @@ public abstract class DefaultRepositoryProxyHandler implements RepositoryProxyHa
 
         try
         {
-            StorageUtil.moveAsset( temp, target, true , StandardCopyOption.REPLACE_EXISTING);
+            org.apache.archiva.repository.storage.util.StorageUtil.moveAsset( temp, target, true , StandardCopyOption.REPLACE_EXISTING);
         }
         catch ( IOException e )
         {
             log.error( "Move failed from {} to {}, trying copy.", temp, target );
             try
             {
-                StorageUtil.copyAsset( temp, target, true );
+                FsStorageUtil.copyAsset( temp, target, true );
                 if (temp.exists()) {
                     temp.getStorage( ).removeAsset( temp );
                 }
@@ -770,7 +836,7 @@ public abstract class DefaultRepositoryProxyHandler implements RepositoryProxyHa
                 pattern = "/" + pattern;
             }
 
-            if ( SelectorUtils.matchPath( pattern, path, false ) )
+            if ( PathUtil.matchPath( pattern, path, false ) )
             {
                 return true;
             }

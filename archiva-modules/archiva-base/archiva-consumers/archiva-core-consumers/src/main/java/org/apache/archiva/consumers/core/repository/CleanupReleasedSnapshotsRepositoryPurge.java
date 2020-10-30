@@ -21,26 +21,28 @@ package org.apache.archiva.consumers.core.repository;
 
 import org.apache.archiva.common.utils.VersionComparator;
 import org.apache.archiva.common.utils.VersionUtil;
+import org.apache.archiva.metadata.audit.RepositoryListener;
 import org.apache.archiva.metadata.repository.MetadataRepository;
 import org.apache.archiva.metadata.repository.MetadataRepositoryException;
 import org.apache.archiva.metadata.repository.RepositorySession;
-import org.apache.archiva.model.ArtifactReference;
-import org.apache.archiva.model.ProjectReference;
-import org.apache.archiva.model.VersionedReference;
-import org.apache.archiva.repository.ContentNotFoundException;
-import org.apache.archiva.repository.LayoutException;
+import org.apache.archiva.repository.content.BaseRepositoryContentLayout;
+import org.apache.archiva.repository.content.ContentNotFoundException;
+import org.apache.archiva.repository.content.ContentAccessException;
+import org.apache.archiva.repository.content.LayoutException;
 import org.apache.archiva.repository.ManagedRepositoryContent;
 import org.apache.archiva.repository.ReleaseScheme;
-import org.apache.archiva.repository.RepositoryException;
 import org.apache.archiva.repository.RepositoryRegistry;
-import org.apache.archiva.metadata.audit.RepositoryListener;
-import org.apache.archiva.repository.metadata.base.MetadataTools;
+import org.apache.archiva.repository.content.Artifact;
+import org.apache.archiva.repository.content.ItemNotFoundException;
+import org.apache.archiva.repository.content.ItemSelector;
+import org.apache.archiva.repository.content.Project;
+import org.apache.archiva.repository.content.Version;
+import org.apache.archiva.repository.content.base.ArchivaItemSelector;
 import org.apache.archiva.repository.metadata.RepositoryMetadataException;
+import org.apache.archiva.repository.metadata.base.MetadataTools;
+import org.apache.archiva.repository.storage.StorageAsset;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -89,25 +91,29 @@ public class CleanupReleasedSnapshotsRepositoryPurge
     {
         try
         {
-            Path artifactFile = Paths.get( repository.getRepoRoot( ), path );
+            StorageAsset artifactFile = repository.getRepository( ).getRoot().resolve( path );
+            BaseRepositoryContentLayout layout = repository.getLayout( BaseRepositoryContentLayout.class );
 
-            if ( !Files.exists(artifactFile) )
+            if ( !artifactFile.exists() )
             {
                 // Nothing to do here, file doesn't exist, skip it.
                 return;
             }
 
-            ArtifactReference artifactRef = repository.toArtifactReference( path );
+            Artifact artifactRef = layout.getArtifact( path );
+            // ArtifactReference artifactRef = repository.toArtifactReference( path );
 
-            if ( !VersionUtil.isSnapshot( artifactRef.getVersion( ) ) )
+            if ( !VersionUtil.isSnapshot( artifactRef.getVersion().getId( ) ) )
             {
                 // Nothing to do here, not a snapshot, skip it.
                 return;
             }
 
-            ProjectReference reference = new ProjectReference( );
-            reference.setGroupId( artifactRef.getGroupId( ) );
-            reference.setArtifactId( artifactRef.getArtifactId( ) );
+            ItemSelector projectSelector = ArchivaItemSelector.builder( )
+                .withNamespace( artifactRef.getNamespace( ).getId() )
+                .withProjectId( artifactRef.getId( ) )
+                .build();
+
 
             // Gether the released versions
             List<String> releasedVersions = new ArrayList<>( );
@@ -118,20 +124,14 @@ public class CleanupReleasedSnapshotsRepositoryPurge
 
                 if ( repo.getActiveReleaseSchemes().contains( ReleaseScheme.RELEASE ))
                 {
-                    try
+                    BaseRepositoryContentLayout repoContent = repo.getContent().getLayout( BaseRepositoryContentLayout.class );
+                    Project proj = repoContent.getProject( projectSelector );
+                    for ( Version version : repoContent.getVersions( proj ) )
                     {
-                        ManagedRepositoryContent repoContent = repo.getContent();
-                        for ( String version : repoContent.getVersions( reference ) )
+                        if ( !VersionUtil.isSnapshot( version.getId() ) )
                         {
-                            if ( !VersionUtil.isSnapshot( version ) )
-                            {
-                                releasedVersions.add( version );
-                            }
+                            releasedVersions.add( version.getId() );
                         }
-                    }
-                    catch ( RepositoryException e )
-                    {
-                        // swallow
                     }
                 }
             }
@@ -141,25 +141,29 @@ public class CleanupReleasedSnapshotsRepositoryPurge
             // Now clean out any version that is earlier than the highest released version.
             boolean needsMetadataUpdate = false;
 
-            VersionedReference versionRef = new VersionedReference( );
-            versionRef.setGroupId( artifactRef.getGroupId( ) );
-            versionRef.setArtifactId( artifactRef.getArtifactId( ) );
+            ArchivaItemSelector.Builder versionSelectorBuilder = ArchivaItemSelector.builder( )
+                .withNamespace( artifactRef.getNamespace().getId() )
+                .withProjectId( artifactRef.getId( ) )
+                .withArtifactId( artifactRef.getId( ) );
 
             MetadataRepository metadataRepository = repositorySession.getRepository( );
 
-            if ( releasedVersions.contains( VersionUtil.getReleaseVersion( artifactRef.getVersion( ) ) ) )
+            if ( releasedVersions.contains( VersionUtil.getReleaseVersion( artifactRef.getVersion().getId( ) ) ) )
             {
-                versionRef.setVersion( artifactRef.getVersion( ) );
-                repository.deleteVersion( versionRef );
-
+                ArchivaItemSelector selector = versionSelectorBuilder.withVersion( artifactRef.getVersion().getId( ) ).build( );
+                Version version = layout.getVersion( selector );
+                if (version.exists())
+                {
+                    repository.deleteItem( version );
+                }
                 for ( RepositoryListener listener : listeners )
                 {
-                    listener.deleteArtifact( metadataRepository, repository.getId( ), artifactRef.getGroupId( ),
-                        artifactRef.getArtifactId( ), artifactRef.getVersion( ),
-                        artifactFile.getFileName().toString() );
+                    listener.deleteArtifact( metadataRepository, repository.getId( ), artifactRef.getNamespace().getId(),
+                        artifactRef.getId( ), artifactRef.getVersion().getId( ),
+                        artifactFile.getName() );
                 }
                 metadataRepository.removeProjectVersion( repositorySession, repository.getId( ),
-                    artifactRef.getGroupId( ), artifactRef.getArtifactId( ), artifactRef.getVersion( ) );
+                    artifactRef.getNamespace().getId(), artifactRef.getId( ), artifactRef.getVersion().getId() );
 
                 needsMetadataUpdate = true;
             }
@@ -173,13 +177,17 @@ public class CleanupReleasedSnapshotsRepositoryPurge
         {
             log.debug( "Not processing file that is not an artifact: {}", e.getMessage( ) );
         }
-        catch ( ContentNotFoundException e )
-        {
-            throw new RepositoryPurgeException( e.getMessage( ), e );
-        }
         catch ( MetadataRepositoryException e )
         {
             log.error( "Could not remove metadata during cleanup of released snapshots of {}", path, e );
+        }
+        catch ( ContentAccessException e )
+        {
+            e.printStackTrace( );
+        }
+        catch ( ItemNotFoundException e )
+        {
+            log.error( "Could not find item to delete {}",e.getMessage( ), e );
         }
     }
 
@@ -189,57 +197,39 @@ public class CleanupReleasedSnapshotsRepositoryPurge
      * -> not sure what needs to be changed here.
      */
     @SuppressWarnings( "deprecation" )
-    private void updateMetadata( ArtifactReference artifact )
+    private void updateMetadata( Artifact artifact )
     {
-        VersionedReference versionRef = new VersionedReference( );
-        versionRef.setGroupId( artifact.getGroupId( ) );
-        versionRef.setArtifactId( artifact.getArtifactId( ) );
-        versionRef.setVersion( artifact.getVersion( ) );
 
-        ProjectReference projectRef = new ProjectReference( );
-        projectRef.setGroupId( artifact.getGroupId( ) );
-        projectRef.setArtifactId( artifact.getArtifactId( ) );
+        ItemSelector versionRef = ArchivaItemSelector.builder( )
+            .withNamespace( artifact.getNamespace( ).getId( ) )
+            .withProjectId( artifact.getId( ) )
+            .withVersion( artifact.getVersion( ).getId( ) ).build( );
+
+        ItemSelector projectRef = ArchivaItemSelector.builder()
+        .withNamespace( artifact.getNamespace().getId( ) )
+        .withProjectId(  artifact.getId( ) ).build();
 
         try
         {
-            metadataTools.updateMetadata( repository, versionRef );
+            metadataTools.updateVersionMetadata( repository, versionRef );
         }
         catch ( ContentNotFoundException e )
         {
             // Ignore. (Just means we have no snapshot versions left to reference).
         }
-        catch ( RepositoryMetadataException e )
-        {
-            // Ignore.
-        }
-        catch ( IOException e )
-        {
-            // Ignore.
-        }
-        catch ( LayoutException e )
+        catch ( RepositoryMetadataException | IOException | LayoutException e )
         {
             // Ignore.
         }
 
         try
         {
-            metadataTools.updateMetadata( repository, projectRef );
+            metadataTools.updateProjectMetadata( repository, projectRef );
         }
-        catch ( ContentNotFoundException e )
+        catch ( ContentNotFoundException | RepositoryMetadataException | IOException | LayoutException e )
         {
             // Ignore. (Just means we have no snapshot versions left to reference).
         }
-        catch ( RepositoryMetadataException e )
-        {
-            // Ignore.
-        }
-        catch ( IOException e )
-        {
-            // Ignore.
-        }
-        catch ( LayoutException e )
-        {
-            // Ignore.
-        }
+
     }
 }

@@ -26,7 +26,7 @@ import org.apache.archiva.common.utils.FileUtils;
 import org.apache.archiva.configuration.Configuration;
 import org.apache.archiva.configuration.ManagedRepositoryConfiguration;
 import org.apache.archiva.configuration.RepositoryGroupConfiguration;
-import org.apache.archiva.maven2.metadata.MavenMetadataReader;
+import org.apache.archiva.metadata.maven.MavenMetadataReader;
 import org.apache.archiva.model.ArchivaRepositoryMetadata;
 import org.apache.commons.lang3.StringUtils;
 import org.junit.After;
@@ -259,7 +259,8 @@ public class RepositoryServletRepositoryGroupTest
 
         Path returnedMetadata = getProjectBase().resolve( "target/test-classes/retrievedMetadataFile.xml" );
         org.apache.archiva.common.utils.FileUtils.writeStringToFile( returnedMetadata, Charset.defaultCharset(), response.getContentAsString() );
-        ArchivaRepositoryMetadata metadata = MavenMetadataReader.read( returnedMetadata );
+        MavenMetadataReader metadataReader = new MavenMetadataReader( );
+        ArchivaRepositoryMetadata metadata = metadataReader.read( returnedMetadata );
 
         assertResponseOK( response );
 

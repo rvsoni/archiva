@@ -18,8 +18,10 @@ package org.apache.archiva.rest.api.services;
  * under the License.
  */
 
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.apache.archiva.admin.model.beans.ProxyConnectorRule;
 import org.apache.archiva.redback.authorization.RedbackAuthorization;
+import org.apache.archiva.rest.api.model.ActionStatus;
 import org.apache.archiva.security.common.ArchivaRoleConstants;
 
 import javax.ws.rs.Consumes;
@@ -37,6 +39,7 @@ import java.util.List;
  * @since 1.4-M3
  */
 @Path ( "/proxyConnectorRuleService/" )
+@Tag(name="Proxy-Repository", description="Handling of proxy repositories that delegate to remote repositories")
 public interface ProxyConnectorRuleService
 {
     @Path ( "proxyConnectorRules" )
@@ -51,7 +54,7 @@ public interface ProxyConnectorRuleService
     @Consumes ( { MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML } )
     @Produces ( { MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML } )
     @RedbackAuthorization ( permissions = ArchivaRoleConstants.OPERATION_MANAGE_CONFIGURATION )
-    Boolean addProxyConnectorRule( ProxyConnectorRule proxyConnectorRule )
+    ActionStatus addProxyConnectorRule( ProxyConnectorRule proxyConnectorRule )
         throws ArchivaRestServiceException;
 
     @Path ( "deleteProxyConnectorRule" )
@@ -59,7 +62,7 @@ public interface ProxyConnectorRuleService
     @Consumes ( { MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML } )
     @Produces ( { MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML } )
     @RedbackAuthorization ( permissions = ArchivaRoleConstants.OPERATION_MANAGE_CONFIGURATION )
-    Boolean deleteProxyConnectorRule( ProxyConnectorRule proxyConnectorRule )
+    ActionStatus deleteProxyConnectorRule( ProxyConnectorRule proxyConnectorRule )
         throws ArchivaRestServiceException;
 
     /**
@@ -70,6 +73,6 @@ public interface ProxyConnectorRuleService
     @Consumes ( { MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML } )
     @Produces ( { MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML } )
     @RedbackAuthorization ( permissions = ArchivaRoleConstants.OPERATION_MANAGE_CONFIGURATION )
-    Boolean updateProxyConnectorRule( ProxyConnectorRule proxyConnectorRule )
+    ActionStatus updateProxyConnectorRule( ProxyConnectorRule proxyConnectorRule )
         throws ArchivaRestServiceException;
 }

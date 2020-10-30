@@ -28,16 +28,16 @@ import org.apache.archiva.admin.repository.DefaultRepositoryCommonValidator;
 import org.apache.archiva.admin.repository.group.DefaultRepositoryGroupAdmin;
 import org.apache.archiva.admin.repository.managed.DefaultManagedRepositoryAdmin;
 import org.apache.archiva.common.filelock.FileLockManager;
-import org.apache.archiva.common.plexusbridge.PlexusSisuBridge;
-import org.apache.archiva.common.plexusbridge.PlexusSisuBridgeException;
 import org.apache.archiva.configuration.ArchivaConfiguration;
 import org.apache.archiva.configuration.Configuration;
 import org.apache.archiva.configuration.FileTypes;
 import org.apache.archiva.configuration.RepositoryGroupConfiguration;
-import org.apache.archiva.metadata.repository.storage.maven2.ArtifactMappingProvider;
+import org.apache.archiva.metadata.repository.storage.RepositoryPathTranslator;
+import org.apache.archiva.repository.ManagedRepositoryContent;
+import org.apache.archiva.repository.maven.content.MavenContentHelper;
+import org.apache.archiva.repository.maven.metadata.storage.ArtifactMappingProvider;
 import org.apache.archiva.proxy.ProxyRegistry;
 import org.apache.archiva.repository.EditableManagedRepository;
-import org.apache.archiva.repository.ManagedRepositoryContent;
 import org.apache.archiva.repository.RemoteRepository;
 import org.apache.archiva.repository.RemoteRepositoryContent;
 import org.apache.archiva.repository.Repository;
@@ -47,8 +47,8 @@ import org.apache.archiva.repository.RepositoryContentProvider;
 import org.apache.archiva.repository.RepositoryException;
 import org.apache.archiva.repository.RepositoryRegistry;
 import org.apache.archiva.repository.RepositoryType;
-import org.apache.archiva.repository.content.maven2.ManagedDefaultRepositoryContent;
-import org.apache.archiva.repository.content.maven2.MavenRepositoryRequestInfo;
+import org.apache.archiva.repository.maven.content.ManagedDefaultRepositoryContent;
+import org.apache.archiva.repository.maven.content.MavenRepositoryRequestInfo;
 import org.apache.archiva.test.utils.ArchivaSpringJUnit4ClassRunner;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.jackrabbit.webdav.DavException;
@@ -67,6 +67,7 @@ import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.test.context.ContextConfiguration;
 
 import javax.inject.Inject;
+import javax.inject.Named;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -126,9 +127,6 @@ public class ArchivaDavResourceFactoryTest
     ApplicationContext applicationContext;
 
     @Inject
-    PlexusSisuBridge plexusSisuBridge;
-
-    @Inject
     DefaultManagedRepositoryAdmin defaultManagedRepositoryAdmin;
 
     @Inject
@@ -140,12 +138,19 @@ public class ArchivaDavResourceFactoryTest
     @Inject
     ProxyRegistry proxyRegistry;
 
+    @Inject
+    @Named( "MavenContentHelper" )
+    MavenContentHelper mavenContentHelper;
 
     @Inject
     DefaultRepositoryGroupAdmin defaultRepositoryGroupAdmin;
 
     @Inject
     List<? extends ArtifactMappingProvider> artifactMappingProviders;
+
+    @Inject
+    @Named( "repositoryPathTranslator#maven2" )
+    RepositoryPathTranslator pathTranslator;
 
     @Inject
     FileLockManager fileLockManager;
@@ -229,7 +234,7 @@ public class ArchivaDavResourceFactoryTest
         repoRequest = repoRequestControl.createMock( MavenRepositoryRequestInfo.class );
 
         resourceFactory =
-            new OverridingArchivaDavResourceFactory( applicationContext, plexusSisuBridge, archivaConfiguration );
+            new OverridingArchivaDavResourceFactory( applicationContext, archivaConfiguration );
         resourceFactory.setArchivaConfiguration( archivaConfiguration );
         proxyRegistry.getAllHandler().get(RepositoryType.MAVEN).clear();
         proxyRegistry.getAllHandler().get(RepositoryType.MAVEN).add(new OverridingRepositoryProxyHandler(this));
@@ -254,15 +259,18 @@ public class ArchivaDavResourceFactoryTest
         throws RepositoryAdminException
     {
         org.apache.archiva.repository.ManagedRepository repo = repositoryRegistry.getManagedRepository( repoId );
-        ManagedRepositoryContent repoContent = new ManagedDefaultRepositoryContent(repo, artifactMappingProviders, fileTypes, fileLockManager);
+        ManagedDefaultRepositoryContent repoContent = new ManagedDefaultRepositoryContent(repo, fileTypes, fileLockManager);
         if (repo!=null && repo instanceof EditableManagedRepository)
         {
             ( (EditableManagedRepository) repo ).setContent( repoContent );
         }
+        repoContent.setMavenContentHelper( mavenContentHelper );
+        repoContent.setArtifactMappingProviders( artifactMappingProviders );
+        repoContent.setPathTranslator( pathTranslator );
         return repoContent;
     }
 
-    private RepositoryContentProvider createRepositoryContentProvider(ManagedRepositoryContent content) {
+    private RepositoryContentProvider createRepositoryContentProvider( ManagedRepositoryContent content) {
         Set<RepositoryType> TYPES = new HashSet<>(  );
         TYPES.add(RepositoryType.MAVEN);
         return new RepositoryContentProvider( )
@@ -357,7 +365,7 @@ public class ArchivaDavResourceFactoryTest
                 repoRequest.getLayout( "org/apache/archiva/archiva/1.2-SNAPSHOT/archiva-1.2-SNAPSHOT.jar" ) ).andReturn(
                 "legacy" );
 
-            expect( repoRequest.toArtifactReference(
+            expect( repoRequest.toItemSelector(
                 "org/apache/archiva/archiva/1.2-SNAPSHOT/archiva-1.2-SNAPSHOT.jar" ) ).andReturn( null );
 
             expect( repoRequest.toNativePath( "org/apache/archiva/archiva/1.2-SNAPSHOT/archiva-1.2-SNAPSHOT.jar"
@@ -437,7 +445,7 @@ public class ArchivaDavResourceFactoryTest
                 repoRequest.getLayout( "org/apache/archiva/archiva/1.2-SNAPSHOT/archiva-1.2-SNAPSHOT.jar" ) ).andReturn(
                 "legacy" );
 
-            expect( repoRequest.toArtifactReference(
+            expect( repoRequest.toItemSelector(
                 "org/apache/archiva/archiva/1.2-SNAPSHOT/archiva-1.2-SNAPSHOT.jar" ) ).andReturn( null );
 
             expect( repoRequest.toNativePath( "org/apache/archiva/archiva/1.2-SNAPSHOT/archiva-1.2-SNAPSHOT.jar"
@@ -521,7 +529,7 @@ public class ArchivaDavResourceFactoryTest
                 repoRequest.getLayout( "org/apache/archiva/archiva/1.2-SNAPSHOT/archiva-1.2-SNAPSHOT.jar" ) ).andReturn(
                 "legacy" ).times( 2 );
 
-            expect( repoRequest.toArtifactReference(
+            expect( repoRequest.toItemSelector(
                 "org/apache/archiva/archiva/1.2-SNAPSHOT/archiva-1.2-SNAPSHOT.jar" ) ).andReturn( null ).times( 2 );
 
             expect( repoRequest.toNativePath( "org/apache/archiva/archiva/1.2-SNAPSHOT/archiva-1.2-SNAPSHOT.jar"
@@ -715,9 +723,8 @@ public class ArchivaDavResourceFactoryTest
         extends ArchivaDavResourceFactory
     {
 
-        OverridingArchivaDavResourceFactory( ApplicationContext applicationContext, PlexusSisuBridge plexusSisuBridge,
+        OverridingArchivaDavResourceFactory( ApplicationContext applicationContext,
                                              ArchivaConfiguration archivaConfiguration )
-            throws PlexusSisuBridgeException
         {
             super( applicationContext, archivaConfiguration );
         }

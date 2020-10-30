@@ -161,8 +161,9 @@ public abstract class AbstractRepository implements EditableRepository, EventHan
     }
 
     @Override
-    public StorageAsset getLocalPath() {
-        return storage.getAsset("");
+    public StorageAsset getRoot( )
+    {
+        return storage.getRoot( );
     }
 
     @Override

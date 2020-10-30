@@ -21,22 +21,29 @@ package org.apache.archiva.consumers.core.repository;
 
 import org.apache.archiva.common.utils.VersionComparator;
 import org.apache.archiva.common.utils.VersionUtil;
-import org.apache.archiva.metadata.repository.RepositorySession;
-import org.apache.archiva.model.ArtifactReference;
-import org.apache.archiva.model.VersionedReference;
-import org.apache.archiva.repository.ContentNotFoundException;
-import org.apache.archiva.repository.LayoutException;
-import org.apache.archiva.repository.ManagedRepositoryContent;
 import org.apache.archiva.metadata.audit.RepositoryListener;
-import org.apache.archiva.repository.storage.StorageAsset;
+import org.apache.archiva.metadata.repository.RepositorySession;
+import org.apache.archiva.repository.content.BaseRepositoryContentLayout;
+import org.apache.archiva.repository.content.ContentAccessException;
+import org.apache.archiva.repository.content.LayoutException;
+import org.apache.archiva.repository.ManagedRepositoryContent;
+import org.apache.archiva.repository.content.Artifact;
+import org.apache.archiva.repository.content.ContentItem;
+import org.apache.archiva.repository.content.base.ArchivaItemSelector;
+import org.apache.commons.lang3.StringUtils;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.*;
+import java.util.Calendar;
+import java.util.Collections;
+import java.util.Date;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.TimeZone;
 import java.util.regex.Matcher;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Purge from repository all snapshots older than the specified days in the repository configuration.
@@ -57,7 +64,7 @@ public class DaysOldRepositoryPurge
         this.retentionPeriod = retentionPeriod;
         this.retentionCount = retentionCount;
         timestampParser = new SimpleDateFormat( "yyyyMMdd.HHmmss" );
-        timestampParser.setTimeZone( TimeZone.getTimeZone("UTC"));
+        timestampParser.setTimeZone( TimeZone.getTimeZone( "UTC" ) );
     }
 
     @Override
@@ -66,78 +73,104 @@ public class DaysOldRepositoryPurge
     {
         try
         {
-            Path artifactFile = Paths.get( repository.getRepoRoot( ), path );
 
-            if ( !Files.exists(artifactFile) )
+            ContentItem item = repository.toItem( path );
+            Artifact artifactItem = repository.getLayout( BaseRepositoryContentLayout.class ).adaptItem( Artifact.class, item );
+
+            if ( !artifactItem.exists( ) )
             {
                 return;
             }
 
-            ArtifactReference artifact = repository.toArtifactReference( path );
+            // ArtifactReference artifact = repository.toArtifactReference( path );
 
-            Calendar olderThanThisDate = Calendar.getInstance( TimeZone.getTimeZone("UTC") );
+            Calendar olderThanThisDate = Calendar.getInstance( TimeZone.getTimeZone( "UTC" ) );
             olderThanThisDate.add( Calendar.DATE, -retentionPeriod );
 
-            // respect retention count
-            VersionedReference reference = new VersionedReference( );
-            reference.setGroupId( artifact.getGroupId( ) );
-            reference.setArtifactId( artifact.getArtifactId( ) );
-            reference.setVersion( artifact.getVersion( ) );
+            ArchivaItemSelector selector = ArchivaItemSelector.builder( )
+                .withNamespace( artifactItem.getVersion( ).getProject( ).getNamespace( ).getId( ) )
+                .withProjectId( artifactItem.getVersion( ).getProject( ).getId( ) )
+                .withVersion( artifactItem.getVersion( ).getId( ) )
+                .withClassifier( "*" )
+                .includeRelatedArtifacts( )
+                .build( );
 
-            List<String> versions = new ArrayList<>( repository.getVersions( reference ) );
+            List<String> artifactVersions;
+            try ( Stream<? extends Artifact> stream = repository.getLayout( BaseRepositoryContentLayout.class ).newArtifactStream( selector ) )
+            {
+                artifactVersions = stream.map( a -> a.getArtifactVersion( ) )
+                    .filter( StringUtils::isNotEmpty )
+                    .distinct( )
+                    .collect( Collectors.toList( ) );
+            }
 
-            Collections.sort( versions, VersionComparator.getInstance( ) );
+            Collections.sort( artifactVersions, VersionComparator.getInstance( ) );
 
-            if ( retentionCount > versions.size( ) )
+            if ( retentionCount > artifactVersions.size( ) )
             {
                 // Done. nothing to do here. skip it.
                 return;
             }
 
-            int countToPurge = versions.size( ) - retentionCount;
+            int countToPurge = artifactVersions.size( ) - retentionCount;
 
-            Set<ArtifactReference> artifactsToDelete = new HashSet<>( );
-            for ( String version : versions )
+
+            ArchivaItemSelector.Builder artifactSelectorBuilder = ArchivaItemSelector.builder( )
+                .withNamespace( artifactItem.getVersion( ).getProject( ).getNamespace( ).getId( ) )
+                .withProjectId( artifactItem.getVersion( ).getProject( ).getId( ) )
+                .withVersion( artifactItem.getVersion( ).getId( ) )
+                .withArtifactId( artifactItem.getId( ) )
+                .withClassifier( "*" )
+                .includeRelatedArtifacts( );
+
+            Set<Artifact> artifactsToDelete = new HashSet<>( );
+            for ( String version : artifactVersions )
             {
                 if ( countToPurge-- <= 0 )
                 {
                     break;
                 }
 
-                ArtifactReference newArtifactReference = repository.toArtifactReference(
-                    artifactFile.toAbsolutePath( ).toString() );
-                newArtifactReference.setVersion( version );
-
-                StorageAsset newArtifactFile = repository.toFile( newArtifactReference );
-
-                // Is this a generic snapshot "1.0-SNAPSHOT" ?
-                if ( VersionUtil.isGenericSnapshot( newArtifactReference.getVersion( ) ) )
+                ArchivaItemSelector artifactSelector = artifactSelectorBuilder.withArtifactVersion( version ).build( );
+                try
                 {
-                    if ( newArtifactFile.getModificationTime().toEpochMilli() < olderThanThisDate.getTimeInMillis( ) )
+
+
+                    // Is this a generic snapshot "1.0-SNAPSHOT" ?
+                    if ( VersionUtil.isGenericSnapshot( version ) )
                     {
-                        artifactsToDelete.addAll( repository.getRelatedArtifacts( newArtifactReference ) );
+                        List<? extends Artifact> artifactList = repository.getLayout( BaseRepositoryContentLayout.class ).getArtifacts( artifactSelector );
+                        if ( artifactList.size( ) > 0 && artifactList.get( 0 ).getAsset( ).getModificationTime( ).toEpochMilli( ) < olderThanThisDate.getTimeInMillis( ) )
+                        {
+                            artifactsToDelete.addAll( artifactList );
+                        }
+                    }
+                    // Is this a timestamp snapshot "1.0-20070822.123456-42" ?
+                    else if ( VersionUtil.isUniqueSnapshot( version ) )
+                    {
+                        Calendar timestampCal = uniqueSnapshotToCalendar( version );
+
+                        if ( timestampCal.getTimeInMillis( ) < olderThanThisDate.getTimeInMillis( ) )
+                        {
+                            artifactsToDelete.addAll( repository.getLayout( BaseRepositoryContentLayout.class ).getArtifacts( artifactSelector ) );
+                        }
                     }
                 }
-                // Is this a timestamp snapshot "1.0-20070822.123456-42" ?
-                else if ( VersionUtil.isUniqueSnapshot( newArtifactReference.getVersion( ) ) )
+                catch ( IllegalArgumentException e )
                 {
-                    Calendar timestampCal = uniqueSnapshotToCalendar( newArtifactReference.getVersion( ) );
-
-                    if ( timestampCal.getTimeInMillis( ) < olderThanThisDate.getTimeInMillis( ) )
-                    {
-                        artifactsToDelete.addAll( repository.getRelatedArtifacts( newArtifactReference ) );
-                    }
+                    log.error( "Bad selector for artifact: {}", e.getMessage( ), e );
+                    // continue
                 }
             }
             purge( artifactsToDelete );
         }
-        catch ( ContentNotFoundException e )
-        {
-            throw new RepositoryPurgeException( e.getMessage( ), e );
-        }
         catch ( LayoutException e )
         {
             log.debug( "Not processing file that is not an artifact: {}", e.getMessage( ) );
+        }
+        catch ( ContentAccessException e )
+        {
+            e.printStackTrace( );
         }
     }
 
@@ -159,7 +192,7 @@ public class DaysOldRepositoryPurge
                 try
                 {
                     versionDate = timestampParser.parse( tsDate + "." + tsTime );
-                    Calendar cal = Calendar.getInstance( TimeZone.getTimeZone("UTC") );
+                    Calendar cal = Calendar.getInstance( TimeZone.getTimeZone( "UTC" ) );
                     cal.setTime( versionDate );
 
                     return cal;

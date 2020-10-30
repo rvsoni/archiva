@@ -19,11 +19,10 @@ package org.apache.archiva.repository.mock;
  * under the License.
  */
 
-import org.apache.archiva.model.ArtifactReference;
-import org.apache.archiva.model.RepositoryURL;
-import org.apache.archiva.repository.LayoutException;
+import org.apache.archiva.repository.content.LayoutException;
 import org.apache.archiva.repository.RemoteRepository;
 import org.apache.archiva.repository.RemoteRepositoryContent;
+import org.apache.archiva.repository.content.ItemSelector;
 import org.springframework.stereotype.Service;
 
 /**
@@ -47,32 +46,21 @@ public class RemoteRepositoryContentMock implements RemoteRepositoryContent
     }
 
     @Override
-    public RepositoryURL getURL( )
-    {
-        return null;
-    }
-
-    @Override
     public void setRepository( RemoteRepository repo )
     {
         this.repository = repo;
     }
 
     @Override
-    public ArtifactReference toArtifactReference( String path ) throws LayoutException
+    public String toPath( ItemSelector selector )
     {
         return null;
     }
 
     @Override
-    public String toPath( ArtifactReference reference )
+    public ItemSelector toItemSelector( String path ) throws LayoutException
     {
         return null;
     }
 
-    @Override
-    public RepositoryURL toURL( ArtifactReference reference )
-    {
-        return null;
-    }
 }

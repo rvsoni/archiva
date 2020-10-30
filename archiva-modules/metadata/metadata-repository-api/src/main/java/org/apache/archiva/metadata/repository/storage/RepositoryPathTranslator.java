@@ -22,8 +22,6 @@ package org.apache.archiva.metadata.repository.storage;
 import org.apache.archiva.metadata.model.ArtifactMetadata;
 import org.apache.archiva.repository.storage.StorageAsset;
 
-import java.nio.file.Path;
-
 public interface RepositoryPathTranslator
 {
     char PATH_SEPARATOR = '/';

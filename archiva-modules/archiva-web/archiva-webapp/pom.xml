@@ -17,7 +17,8 @@
   ~ specific language governing permissions and limitations
   ~ under the License.
   -->
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <groupId>org.apache.archiva</groupId>
@@ -35,105 +36,106 @@
     <archiva.logMissingI18n>true</archiva.logMissingI18n>
     <archivaAppServerBase>${project.build.directory}/appserver-base</archivaAppServerBase>
     <jettyDumpOnStart>false</jettyDumpOnStart>
-    <archiva.baseRestUrl />
-    <rest.admin.pwd />
+    <archiva.baseRestUrl/>
+    <rest.admin.pwd/>
     <archiva.groupIndexTtl>30</archiva.groupIndexTtl>
     <archiva.repositorySessionFactory.id>jcr</archiva.repositorySessionFactory.id>
     <cassandra.host>localhost</cassandra.host>
     <cassandra.port>9160</cassandra.port>
     <site.staging.base>${project.parent.parent.basedir}</site.staging.base>
+
+
+    <webjars.bootstrap.version>4.5.0</webjars.bootstrap.version>
+    <webjars.jquery.version>3.5.1</webjars.jquery.version>
+    <webjars.jquery-ui.version>1.12.1</webjars.jquery-ui.version>
+    <webjars.requirejs.version>2.3.6</webjars.requirejs.version>
+    <webjars.font-awesome.version>5.13.0</webjars.font-awesome.version>
+    <webjars.d3js.version>5.16.0</webjars.d3js.version>
+    <webjars.locator.version>0.40</webjars.locator.version>
+    <webjars.sammy.version>0.7.4</webjars.sammy.version>
+    <webjars.jquery.typeahead.version>2.10.4</webjars.jquery.typeahead.version>
+    <webjars.jquery.fileupload.version>9.10.1</webjars.jquery.fileupload.version>
+    <webjars.jquery.i18nproperties.version>1.2.7</webjars.jquery.i18nproperties.version>
   </properties>
 
   <dependencies>
     <dependency>
       <groupId>org.apache.archiva</groupId>
       <artifactId>generic-metadata-support</artifactId>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.archiva</groupId>
       <artifactId>repository-statistics</artifactId>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.archiva</groupId>
       <artifactId>problem-reports</artifactId>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.archiva</groupId>
       <artifactId>audit</artifactId>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.archiva</groupId>
       <artifactId>archiva-scheduler-repository</artifactId>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.archiva.maven</groupId>
       <artifactId>archiva-maven-indexer</artifactId>
+      <scope>runtime</scope>
     </dependency>
 
     <dependency>
       <groupId>org.apache.archiva</groupId>
       <artifactId>archiva-filelock</artifactId>
+      <scope>runtime</scope>
     </dependency>
 
     <dependency>
       <groupId>org.apache.archiva</groupId>
       <artifactId>archiva-repository-admin-api</artifactId>
-    </dependency>
-
-    <dependency>
-      <groupId>com.lmax</groupId>
-      <artifactId>disruptor</artifactId>
-    </dependency>
-
-    <dependency>
-      <groupId>org.eclipse.sisu</groupId>
-      <artifactId>org.eclipse.sisu.plexus</artifactId>
-      <exclusions>
-        <exclusion>
-          <groupId>org.sonatype.sisu</groupId>
-          <artifactId>sisu-guice</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-    <dependency>
-      <groupId>com.google.inject</groupId>
-      <artifactId>guice</artifactId>
-      <classifier>no_aop</classifier>
-    </dependency>
-
-    <dependency>
-      <groupId>com.google.guava</groupId>
-      <artifactId>guava</artifactId>
+      <scope>runtime</scope>
     </dependency>
 
     <dependency>
       <groupId>org.apache.archiva</groupId>
       <artifactId>archiva-repository-admin-default</artifactId>
+      <scope>runtime</scope>
     </dependency>
 
     <dependency>
       <groupId>org.apache.archiva</groupId>
       <artifactId>metadata-repository-api</artifactId>
+      <scope>runtime</scope>
     </dependency>
 
     <dependency>
       <groupId>org.apache.archiva</groupId>
       <artifactId>metadata-store-jcr</artifactId>
+      <scope>runtime</scope>
     </dependency>
 
     <dependency>
       <groupId>org.apache.archiva</groupId>
       <artifactId>metadata-store-file</artifactId>
+      <scope>runtime</scope>
     </dependency>
 
     <dependency>
       <groupId>org.apache.archiva</groupId>
       <artifactId>metadata-store-cassandra</artifactId>
+      <scope>runtime</scope>
     </dependency>
 
     <dependency>
-      <groupId>commons-configuration</groupId>
-      <artifactId>commons-configuration</artifactId>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-configuration2</artifactId>
+      <scope>runtime</scope>
       <exclusions>
         <exclusion>
           <groupId>commons-beanutils</groupId>
@@ -149,6 +151,7 @@
     <dependency>
       <groupId>commons-digester</groupId>
       <artifactId>commons-digester</artifactId>
+      <scope>runtime</scope>
       <exclusions>
         <exclusion>
           <groupId>commons-logging</groupId>
@@ -159,6 +162,7 @@
     <dependency>
       <groupId>commons-beanutils</groupId>
       <artifactId>commons-beanutils</artifactId>
+      <scope>runtime</scope>
       <exclusions>
         <exclusion>
           <groupId>commons-logging</groupId>
@@ -170,27 +174,19 @@
     <dependency>
       <groupId>commons-io</groupId>
       <artifactId>commons-io</artifactId>
+      <scope>runtime</scope>
     </dependency>
 
     <dependency>
       <groupId>org.apache.archiva.maven</groupId>
-      <!--  FIXME: temporary coupling to plugin, should be runtime -->
       <artifactId>archiva-maven-repository</artifactId>
-      <exclusions>
-        <exclusion>
-          <groupId>commons-logging</groupId>
-          <artifactId>commons-logging-api</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>log4j</groupId>
-          <artifactId>log4j</artifactId>
-        </exclusion>
-      </exclusions>
+      <scope>runtime</scope>
     </dependency>
 
     <dependency>
       <groupId>org.codehaus.plexus</groupId>
       <artifactId>plexus-utils</artifactId>
+      <scope>runtime</scope>
     </dependency>
     <!-- normally not needed as we are 1.6 required
       but due to http://jira.codehaus.org/browse/MODELLO-266
@@ -198,17 +194,10 @@
       ibm jdk stax impl won't work with
      -->
     <dependency>
-      <groupId>org.codehaus.woodstox</groupId>
-      <artifactId>woodstox-core-asl</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ant</groupId>
-      <artifactId>ant</artifactId>
-    </dependency>
-    <dependency>
       <groupId>org.apache.maven.indexer</groupId>
       <artifactId>indexer-core</artifactId>
       <classifier>shaded-lucene</classifier>
+      <scope>runtime</scope>
       <exclusions>
         <exclusion>
           <groupId>org.codehaus.plexus</groupId>
@@ -269,6 +258,7 @@
     <dependency>
       <groupId>org.apache.httpcomponents</groupId>
       <artifactId>httpclient</artifactId>
+      <scope>runtime</scope>
       <exclusions>
         <exclusion>
           <groupId>commons-logging</groupId>
@@ -279,6 +269,7 @@
     <dependency>
       <groupId>org.apache.httpcomponents</groupId>
       <artifactId>httpcore</artifactId>
+      <scope>runtime</scope>
       <exclusions>
         <exclusion>
           <groupId>commons-logging</groupId>
@@ -290,10 +281,12 @@
     <dependency>
       <groupId>org.apache.archiva</groupId>
       <artifactId>archiva-repository-layer</artifactId>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.archiva</groupId>
       <artifactId>archiva-xml-tools</artifactId>
+      <scope>runtime</scope>
       <exclusions>
         <exclusion>
           <groupId>xerces</groupId>
@@ -304,14 +297,17 @@
     <dependency>
       <groupId>org.apache.archiva</groupId>
       <artifactId>archiva-security</artifactId>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.archiva</groupId>
       <artifactId>archiva-core-consumers</artifactId>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.archiva</groupId>
       <artifactId>archiva-configuration</artifactId>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.archiva</groupId>
@@ -320,41 +316,24 @@
     </dependency>
     <dependency>
       <groupId>org.apache.archiva</groupId>
-      <artifactId>archiva-lucene-consumers</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.lucene</groupId>
-      <artifactId>lucene-core</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.lucene</groupId>
-      <artifactId>lucene-queries</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.lucene</groupId>
-      <artifactId>lucene-memory</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.lucene</groupId>
-      <artifactId>lucene-highlighter</artifactId>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.archiva</groupId>
       <artifactId>stage-repository-merge</artifactId>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.archiva</groupId>
       <artifactId>archiva-signature-consumers</artifactId>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.archiva</groupId>
       <artifactId>archiva-rss</artifactId>
+      <scope>runtime</scope>
     </dependency>
 
     <dependency>
       <groupId>org.apache.archiva</groupId>
       <artifactId>archiva-rest-services</artifactId>
+      <scope>runtime</scope>
       <exclusions>
         <exclusion>
           <groupId>org.eclipse.jetty</groupId>
@@ -379,22 +358,6 @@
         <exclusion>
           <groupId>org.eclipse.jetty</groupId>
           <artifactId>jetty-security</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>commons-logging</groupId>
-          <artifactId>commons-logging</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.geronimo.specs</groupId>
-          <artifactId>geronimo-servlet_3.0_spec</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.geronimo.specs</groupId>
-          <artifactId>geronimo-javamail_1.4_spec</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.geronimo.specs</groupId>
-          <artifactId>geronimo-servlet_2.5_spec</artifactId>
         </exclusion>
       </exclusions>
     </dependency>
@@ -402,25 +365,18 @@
     <dependency>
       <groupId>org.apache.archiva.components.registry</groupId>
       <artifactId>archiva-components-spring-registry-api</artifactId>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.archiva.components.registry</groupId>
       <artifactId>archiva-components-spring-registry-commons</artifactId>
-      <exclusions>
-        <exclusion>
-          <groupId>commons-logging</groupId>
-          <artifactId>commons-logging-api</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>commons-logging</groupId>
-          <artifactId>commons-logging</artifactId>
-        </exclusion>
-      </exclusions>
+      <scope>runtime</scope>
     </dependency>
 
     <dependency>
       <groupId>org.apache.archiva</groupId>
       <artifactId>archiva-rest-api</artifactId>
+      <scope>runtime</scope>
       <exclusions>
         <exclusion>
           <groupId>org.eclipse.jetty</groupId>
@@ -446,28 +402,13 @@
           <groupId>org.eclipse.jetty</groupId>
           <artifactId>jetty-security</artifactId>
         </exclusion>
-        <exclusion>
-          <groupId>commons-logging</groupId>
-          <artifactId>commons-logging</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.geronimo.specs</groupId>
-          <artifactId>geronimo-servlet_3.0_spec</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.geronimo.specs</groupId>
-          <artifactId>geronimo-javamail_1.4_spec</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.geronimo.specs</groupId>
-          <artifactId>geronimo-servlet_2.5_spec</artifactId>
-        </exclusion>
       </exclusions>
     </dependency>
 
     <dependency>
       <groupId>org.apache.archiva</groupId>
       <artifactId>archiva-web-common</artifactId>
+      <scope>runtime</scope>
       <exclusions>
         <exclusion>
           <groupId>javax.servlet</groupId>
@@ -479,26 +420,19 @@
     <dependency>
       <groupId>org.apache.archiva</groupId>
       <artifactId>archiva-webdav</artifactId>
+      <scope>runtime</scope>
       <exclusions>
         <exclusion>
           <groupId>javax.servlet</groupId>
           <artifactId>servlet-api</artifactId>
         </exclusion>
-        <exclusion>
-          <groupId>org.slf4j</groupId>
-          <artifactId>jcl-over-slf4j</artifactId>
-        </exclusion>
       </exclusions>
-    </dependency>
-
-    <dependency>
-      <groupId>cglib</groupId>
-      <artifactId>cglib</artifactId>
     </dependency>
 
     <dependency>
       <groupId>org.apache.archiva.components.cache</groupId>
       <artifactId>archiva-components-spring-cache-ehcache</artifactId>
+      <scope>runtime</scope>
       <exclusions>
         <exclusion>
           <groupId>commons-logging</groupId>
@@ -509,6 +443,7 @@
     <dependency>
       <groupId>net.sf.ehcache</groupId>
       <artifactId>ehcache</artifactId>
+      <scope>runtime</scope>
       <exclusions>
         <exclusion>
           <groupId>commons-logging</groupId>
@@ -520,40 +455,38 @@
     <dependency>
       <groupId>org.apache.archiva.components</groupId>
       <artifactId>archiva-components-spring-quartz</artifactId>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.quartz-scheduler</groupId>
       <artifactId>quartz</artifactId>
+      <scope>runtime</scope>
     </dependency>
 
     <dependency>
       <groupId>org.apache.archiva.redback</groupId>
       <artifactId>redback-rbac-ldap</artifactId>
+      <scope>runtime</scope>
     </dependency>
-
     <dependency>
       <groupId>org.apache.archiva.redback</groupId>
       <artifactId>redback-rest-services</artifactId>
-      <exclusions>
-        <exclusion>
-          <groupId>javax.servlet</groupId>
-          <artifactId>javax.servlet-api</artifactId>
-        </exclusion>
-      </exclusions>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.archiva.redback</groupId>
       <artifactId>redback-common-integrations</artifactId>
-      <exclusions>
-        <exclusion>
-          <groupId>stax</groupId>
-          <artifactId>stax-api</artifactId>
-        </exclusion>
-      </exclusions>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.archiva.redback</groupId>
       <artifactId>redback-integrations-security</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.archiva.redback</groupId>
+      <artifactId>redback-rbac-jpa</artifactId>
+      <scope>runtime</scope>
     </dependency>
 
     <dependency>
@@ -579,24 +512,23 @@
     <dependency>
       <groupId>org.apache.cxf</groupId>
       <artifactId>cxf-rt-frontend-jaxrs</artifactId>
+      <scope>runtime</scope>
     </dependency>
 
     <dependency>
       <groupId>org.apache.cxf</groupId>
       <artifactId>cxf-rt-rs-extension-providers</artifactId>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.springframework</groupId>
       <artifactId>spring-core</artifactId>
+      <scope>runtime</scope>
     </dependency>
-    <dependency>
-      <groupId>org.springframework</groupId>
-      <artifactId>spring-web</artifactId>
-    </dependency>
-
     <dependency>
       <groupId>org.jsoup</groupId>
       <artifactId>jsoup</artifactId>
+      <scope>runtime</scope>
     </dependency>
 
     <dependency>
@@ -612,15 +544,15 @@
       <scope>test</scope>
       <exclusions>
         <exclusion>
-          <groupId>javax.servlet</groupId>
-          <artifactId>javax.servlet-api</artifactId>
+          <groupId>jakarta.servlet</groupId>
+          <artifactId>jakarta.servlet-api</artifactId>
         </exclusion>
       </exclusions>
     </dependency>
 
     <dependency>
-      <groupId>javax.mail</groupId>
-      <artifactId>mail</artifactId>
+      <groupId>jakarta.mail</groupId>
+      <artifactId>jakarta.mail-api</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
@@ -650,16 +582,79 @@
       <groupId>org.springframework</groupId>
       <artifactId>spring-orm</artifactId>
       <version>${spring.version}</version>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.springframework</groupId>
       <artifactId>spring-context</artifactId>
       <version>${spring.version}</version>
+      <scope>runtime</scope>
     </dependency>
 
     <dependency>
-      <groupId>org.codehaus.plexus</groupId>
-      <artifactId>plexus-slf4j-logging</artifactId>
+      <groupId>org.webjars</groupId>
+      <artifactId>bootstrap</artifactId>
+      <version>${webjars.bootstrap.version}</version>
+      <scope>runtime</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>org.webjars</groupId>
+      <artifactId>jquery</artifactId>
+      <version>${webjars.jquery.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.webjars</groupId>
+      <artifactId>jquery-ui</artifactId>
+      <version>${webjars.jquery-ui.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.webjars</groupId>
+      <artifactId>requirejs</artifactId>
+      <version>${webjars.requirejs.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.webjars</groupId>
+      <artifactId>font-awesome</artifactId>
+      <version>${webjars.font-awesome.version}</version>
+      <scope>runtime</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>org.webjars</groupId>
+      <artifactId>d3js</artifactId>
+      <version>${webjars.d3js.version}</version>
+      <scope>runtime</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>org.webjars</groupId>
+      <artifactId>webjars-locator</artifactId>
+      <version>${webjars.locator.version}</version>
+      <scope>runtime</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>org.webjars</groupId>
+      <artifactId>sammy</artifactId>
+      <version>${webjars.sammy.version}</version>
+      <scope>runtime</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>org.webjars</groupId>
+      <artifactId>jquery-file-upload</artifactId>
+      <version>${webjars.jquery.fileupload.version}</version>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.webjars</groupId>
+      <artifactId>jquery-i18n-properties</artifactId>
+      <version>${webjars.jquery.i18nproperties.version}</version>
+      <scope>runtime</scope>
     </dependency>
 
   </dependencies>
@@ -679,7 +674,7 @@
           <artifactId>apache-rat-plugin</artifactId>
           <configuration>
             <excludes>
-              <exclude>nbactions.xml</exclude>  
+              <exclude>nbactions.xml</exclude>
               <exclude>src/main/webapp/css/*.css</exclude>
               <exclude>src/main/webapp/js/*.js</exclude>
               <exclude>src/site/resources/css/*.css</exclude>
@@ -687,6 +682,13 @@
               <exclude>src/test/repositories/test-repo/**</exclude>
               <exclude>src/main/resources/META-INF/services/*</exclude>
               <exclude>src/main/resources/META-INF/cxf/*</exclude>
+              <exclude>src/main/resources/META-INF/owasp/cve-suppressions.xml</exclude>
+              <exclude>src/main/archiva-web/*</exclude>
+              <exclude>src/main/archiva-web/node_modules/**</exclude>
+              <exclude>src/main/archiva-web/dist/**</exclude>
+              <exclude>src/main/archiva-web/src/polyfills.ts</exclude>
+              <exclude>src/main/archiva-web/e2e/protractor.conf.js</exclude>
+              <exclude>src/main/archiva-web/e2e/tsconfig.json</exclude>
             </excludes>
           </configuration>
         </plugin>
@@ -695,79 +697,35 @@
 
     <plugins>
 
-      <!-- commented as not needed now
+
       <plugin>
-        <groupId>com.samaxes.maven</groupId>
-        <artifactId>maven-minify-plugin</artifactId>
-        <version>1.3.5</version>
-        <executions>
-          <execution>
-            <id>startup-minify</id>
-            <phase>generate-resources</phase>
-            <configuration>
-              <webappSourceDir>${basedir}/src/main/webapp</webappSourceDir>
-              <cssSourceDir>css</cssSourceDir>
-              <cssSourceFiles>
-                <cssSourceFile>jquery-ui-1.8.16.custom.css</cssSourceFile>
-                <cssSourceFile>jquery.ui.1.8.16.ie.css</cssSourceFile>
-                <cssSourceFile>bootstrap.2.0.2.css</cssSourceFile>
-                <cssSourceFile>archiva.css</cssSourceFile>
-              </cssSourceFiles>
-              <cssFinalFile>apache-archiva-${project.version}.css</cssFinalFile>
-              <jsSourceDir>js</jsSourceDir>
-              <jsSourceFiles>
-                <jsSourceFile>jquery-1.7.2.js</jsSourceFile>
-                <jsSourceFile>lab.js</jsSourceFile>
-                <jsSourceFile>require.1.0.1.js</jsSourceFile>
-              </jsSourceFiles>
-              <jsFinalFile>apache-archiva-startup-${project.version}.js</jsFinalFile>
-            </configuration>
-            <goals>
-              <goal>minify</goal>
-            </goals>
-          </execution>
-          <execution>
-            <id>main-minify</id>
-            <phase>generate-resources</phase>
-            <configuration>
-              <webappSourceDir>${basedir}/src/main/webapp</webappSourceDir>
-              <jsSourceDir>js</jsSourceDir>
-              <jsSourceFiles>
-                <jsSourceFile>jquery.tmpl.js</jsSourceFile>
-                <jsSourceFile>archiva/utils.js</jsSourceFile>
-                <jsSourceFile>jquery.i18n.properties-1.0.9.js</jsSourceFile>
-                <jsSourceFile>archiva/i18nload.js</jsSourceFile>
-                <jsSourceFile>jquery.cookie.1.0.0.js</jsSourceFile>
-                <jsSourceFile>knockout-debug.js</jsSourceFile>
-                <jsSourceFile>jquery-ui-1.8.16.custom.min.js</jsSourceFile>
-                <jsSourceFile>jquery.validate.js</jsSourceFile>
-                <jsSourceFile>jquery.json-2.3.min.js</jsSourceFile>
-                <jsSourceFile>archiva/main-tmpl.js</jsSourceFile>
-                <jsSourceFile>archiva/repositories.js</jsSourceFile>
-                <jsSourceFile>archiva/network-proxies.js</jsSourceFile>
-                <jsSourceFile>archiva/proxy-connectors.js</jsSourceFile>
-                <jsSourceFile>redback/operation.js</jsSourceFile>
-                <jsSourceFile>redback/redback-tmpl.js</jsSourceFile>
-                <jsSourceFile>bootstrap.2.0.2.js</jsSourceFile>
-                <jsSourceFile>knockout.simpleGrid.js</jsSourceFile>
-                <jsSourceFile>redback/user.js</jsSourceFile>
-                <jsSourceFile>redback/users.js</jsSourceFile>
-                <jsSourceFile>redback/redback.js</jsSourceFile>
-                <jsSourceFile>redback/register.js</jsSourceFile>
-                <jsSourceFile>redback/permission.js</jsSourceFile>
-                <jsSourceFile>redback/resource.js</jsSourceFile>
-                <jsSourceFile>redback/roles.js</jsSourceFile>
-                <jsSourceFile>archiva/main.js</jsSourceFile>
-              </jsSourceFiles>
-              <jsFinalFile>apache-archiva-main-${project.version}.js</jsFinalFile>
-            </configuration>
-            <goals>
-              <goal>minify</goal>
-            </goals>
-          </execution>
-        </executions>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-war-plugin</artifactId>
+        <configuration>
+          <archive>
+            <manifest>
+              <addDefaultImplementationEntries>true</addDefaultImplementationEntries>
+              <addDefaultSpecificationEntries>true</addDefaultSpecificationEntries>
+            </manifest>
+          </archive>
+          <webResources>
+            <webResource>
+              <directory>.</directory>
+              <includes>
+                <include>LICENSE</include>
+              </includes>
+            </webResource>
+            <webResource>
+              <directory>${project.build.directory}/maven-shared-archive-resources/META-INF/</directory>
+              <includes>
+                <include>NOTICE</include>
+              </includes>
+            </webResource>
+          </webResources>
+
+        </configuration>
       </plugin>
-      -->
+
       <plugin>
         <groupId>org.eclipse.jetty</groupId>
         <artifactId>jetty-maven-plugin</artifactId>
@@ -844,7 +802,7 @@
               <value>${openjpa.Log}</value>
             </systemProperty>
           </systemProperties>
-
+          <useTestScope>false</useTestScope>
         </configuration>
         <dependencies>
           <dependency>
@@ -853,29 +811,61 @@
             <version>${derbyVersion}</version>
           </dependency>
           <dependency>
-            <groupId>javax.mail</groupId>
-            <artifactId>mail</artifactId>
-            <version>${javaxMailVersion}</version>
+            <groupId>jakarta.mail</groupId>
+            <artifactId>jakarta.mail-api</artifactId>
+            <version>${jakarta.mail.version}</version>
           </dependency>
           <dependency>
             <groupId>org.apache.openjpa</groupId>
             <artifactId>openjpa</artifactId>
             <version>${openjpaVersion}</version>
+            <exclusions>
+              <exclusion>
+                <groupId>junit</groupId>
+                <artifactId>junit</artifactId>
+              </exclusion>
+              <exclusion>
+                <groupId>org.apache.geronimo.specs</groupId>
+                <artifactId>geronimo-jms_1.1_spec</artifactId>
+              </exclusion>
+              <exclusion>
+                <groupId>org.apache.geronimo.specs</groupId>
+                <artifactId>geronimo-jta_1.1_spec</artifactId>
+              </exclusion>
+              <exclusion>
+                <groupId>java.xml.stream</groupId>
+                <artifactId>stax-api</artifactId>
+              </exclusion>
+              <exclusion>
+                <groupId>javax.xml.bind</groupId>
+                <artifactId>jaxb-api</artifactId>
+              </exclusion>
+              <exclusion>
+                <groupId>com.sun.xml.bind</groupId>
+                <artifactId>jaxb-impl</artifactId>
+              </exclusion>
+            </exclusions>
+
           </dependency>
           <dependency>
-            <groupId>org.apache.geronimo.specs</groupId>
-            <artifactId>geronimo-jpa_2.0_spec</artifactId>
-            <version>1.1</version>
+            <groupId>jakarta.persistence</groupId>
+            <artifactId>jakarta.persistence-api</artifactId>
+            <version>${jakarta.persistence.version}</version>
           </dependency>
           <dependency>
-            <groupId>org.apache.geronimo.specs</groupId>
-            <artifactId>geronimo-jta_1.1_spec</artifactId>
-            <version>1.1.1</version>
+            <groupId>jakarta.transaction</groupId>
+            <artifactId>jakarta.transaction-api</artifactId>
+            <version>${jakarta.transaction.version}</version>
           </dependency>
           <dependency>
-            <groupId>net.sourceforge.serp</groupId>
-            <artifactId>serp</artifactId>
-            <version>1.15.1</version>
+            <groupId>jakarta.ws.rs</groupId>
+            <artifactId>jakarta.ws.rs-api</artifactId>
+            <version>${jakarta.ws.rs.version}</version>
+          </dependency>
+          <dependency>
+            <groupId>com.sun.mail</groupId>
+            <artifactId>jakarta.mail</artifactId>
+            <version>${jakarta.mail.version}</version>
           </dependency>
           <dependency>
             <groupId>org.eclipse.jetty</groupId>
@@ -911,7 +901,7 @@
             </goals>
             <configuration>
               <target>
-                <mkdir dir="${project.build.directory}/appserver-base/conf" />
+                <mkdir dir="${project.build.directory}/appserver-base/conf"/>
               </target>
             </configuration>
           </execution>
@@ -934,33 +924,29 @@
         </configuration>
       </plugin>
 
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-war-plugin</artifactId>
-        <configuration>
-          <archive>
-            <manifest>
-              <addDefaultImplementationEntries>true</addDefaultImplementationEntries>
-              <addDefaultSpecificationEntries>true</addDefaultSpecificationEntries>
-            </manifest>
-          </archive>
-          <webResources>
-            <webResource>
-              <directory>.</directory>
-              <includes>
-                <include>LICENSE</include>
-              </includes>
-            </webResource>
-            <webResource>
-              <directory>${project.build.directory}/maven-shared-archive-resources/META-INF/</directory>
-              <includes>
-                <include>NOTICE</include>
-              </includes>
-            </webResource>
-          </webResources>
-        </configuration>
-      </plugin>
 
+
+
+      <plugin>
+        <groupId>org.owasp</groupId>
+        <artifactId>dependency-check-maven</artifactId>
+        <version>5.3.2</version>
+        <configuration>
+          <skipProvidedScope>true</skipProvidedScope>
+          <failBuildOnCVSS>8</failBuildOnCVSS>
+          <suppressionFile>${project.basedir}/src/main/resources/META-INF/owasp/cve-suppressions.xml</suppressionFile>
+          <ossindexAnalyzerEnabled>false</ossindexAnalyzerEnabled>
+          <assemblyAnalyzerEnabled>false</assemblyAnalyzerEnabled>
+          <nodeAnalyzerEnabled>false</nodeAnalyzerEnabled>
+        </configuration>
+        <executions>
+          <execution>
+            <goals>
+              <goal>check</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
     </plugins>
   </build>
 

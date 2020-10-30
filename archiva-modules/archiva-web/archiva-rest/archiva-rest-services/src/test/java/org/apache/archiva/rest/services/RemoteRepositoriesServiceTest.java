@@ -176,7 +176,7 @@ public class RemoteRepositoriesServiceTest
 
             service.addRemoteRepository(getRemoteRepository());
 
-            assertTrue(service.checkRemoteConnectivity("id-new"));
+            assertTrue(service.checkRemoteConnectivity("id-new").isSuccess());
         } finally {
             removeRemoteRepositories("id-new");
         }
@@ -198,7 +198,7 @@ public class RemoteRepositoriesServiceTest
 
             service.addRemoteRepository(getRemoteMavenRepository());
 
-            assertTrue(service.checkRemoteConnectivity("id-maven1"));
+            assertTrue(service.checkRemoteConnectivity("id-maven1").isSuccess());
         } finally {
             removeRemoteRepositories("id-maven1");
         }
@@ -222,7 +222,7 @@ public class RemoteRepositoriesServiceTest
 
             service.addRemoteRepository(getRemoteOracleRepository());
 
-            assertTrue(service.checkRemoteConnectivity("id-oracle"));
+            assertTrue(service.checkRemoteConnectivity("id-oracle").isSuccess());
         } finally {
             removeRemoteRepositories("id-oracle");
         }
@@ -238,7 +238,7 @@ public class RemoteRepositoriesServiceTest
 
     RemoteRepository getRemoteMavenRepository()
     {
-        return new RemoteRepository( Locale.getDefault( ),"id-maven1", "Maven1", "http://repo.maven.apache.org/maven2", "default", "foo", "foopassword", 120,
+        return new RemoteRepository( Locale.getDefault( ),"id-maven1", "Maven1", "https://repo.maven.apache.org/maven2", "default", "foo", "foopassword", 120,
                 "cool repo3" );
     }
 

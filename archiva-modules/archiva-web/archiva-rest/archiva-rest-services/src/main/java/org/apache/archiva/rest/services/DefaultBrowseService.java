@@ -21,8 +21,9 @@ package org.apache.archiva.rest.services;
 import org.apache.archiva.admin.model.beans.ManagedRepository;
 import org.apache.archiva.common.utils.VersionComparator;
 import org.apache.archiva.common.utils.VersionUtil;
-import org.apache.archiva.dependency.tree.maven2.DependencyTreeBuilder;
-import org.apache.archiva.maven2.metadata.MavenMetadataReader;
+import org.apache.archiva.repository.ManagedRepositoryContent;
+import org.apache.archiva.repository.content.base.ArchivaItemSelector;
+import org.apache.archiva.repository.maven.dependency.tree.DependencyTreeBuilder;
 import org.apache.archiva.maven2.model.Artifact;
 import org.apache.archiva.maven2.model.TreeEntry;
 import org.apache.archiva.metadata.generic.GenericMetadataFacet;
@@ -31,26 +32,25 @@ import org.apache.archiva.metadata.model.MetadataFacet;
 import org.apache.archiva.metadata.model.ProjectVersionMetadata;
 import org.apache.archiva.metadata.model.ProjectVersionReference;
 import org.apache.archiva.metadata.repository.*;
-import org.apache.archiva.metadata.repository.storage.maven2.ArtifactMetadataVersionComparator;
-import org.apache.archiva.metadata.repository.storage.maven2.MavenProjectFacet;
-import org.apache.archiva.model.ArchivaArtifact;
+import org.apache.archiva.repository.maven.metadata.storage.ArtifactMetadataVersionComparator;
+import org.apache.archiva.repository.maven.metadata.storage.MavenProjectFacet;
 import org.apache.archiva.model.ArchivaRepositoryMetadata;
 import org.apache.archiva.proxy.ProxyRegistry;
 import org.apache.archiva.proxy.model.RepositoryProxyHandler;
 import org.apache.archiva.components.cache.Cache;
-import org.apache.archiva.repository.ManagedRepositoryContent;
 import org.apache.archiva.repository.ReleaseScheme;
 import org.apache.archiva.repository.RepositoryException;
 import org.apache.archiva.repository.RepositoryNotFoundException;
+import org.apache.archiva.repository.RepositoryRegistry;
+import org.apache.archiva.repository.metadata.MetadataReader;
 import org.apache.archiva.repository.metadata.base.MetadataTools;
+import org.apache.archiva.repository.storage.fs.FsStorageUtil;
 import org.apache.archiva.repository.storage.StorageAsset;
-import org.apache.archiva.repository.storage.StorageUtil;
 import org.apache.archiva.rest.api.model.*;
 import org.apache.archiva.rest.api.services.ArchivaRestServiceException;
 import org.apache.archiva.rest.api.services.BrowseService;
 import org.apache.archiva.rest.services.utils.ArtifactContentEntryComparator;
 import org.apache.archiva.security.ArchivaSecurityException;
-import org.apache.archiva.xml.XMLException;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -87,10 +87,13 @@ public class DefaultBrowseService
     ProxyRegistry proxyRegistry;
 
     @Inject
+    RepositoryRegistry repositoryRegistry;
+
+    @Inject
     @Named( value = "browse#versionMetadata" )
     private Cache<String, ProjectVersionMetadata> versionMetadataCache;
 
-    private ManagedRepositoryContent getManagedRepositoryContent(String id) throws RepositoryException
+    private ManagedRepositoryContent getManagedRepositoryContent( String id) throws RepositoryException
     {
         org.apache.archiva.repository.ManagedRepository repo = repositoryRegistry.getManagedRepository( id );
         if (repo==null) {
@@ -610,8 +613,8 @@ public class DefaultBrowseService
     }
 
     @Override
-    public Boolean addMetadata( String groupId, String artifactId, String version, String key, String value,
-                                String repositoryId )
+    public ActionStatus addMetadata( String groupId, String artifactId, String version, String key, String value,
+                                     String repositoryId )
         throws ArchivaRestServiceException
     {
         ProjectVersionMetadata projectVersionMetadata =
@@ -619,7 +622,7 @@ public class DefaultBrowseService
 
         if ( projectVersionMetadata == null )
         {
-            return Boolean.FALSE;
+            return new ActionStatus( false );
         }
 
         Map<String, String> properties = new HashMap<>();
@@ -669,11 +672,11 @@ public class DefaultBrowseService
         {
             repositorySession.close();
         }
-        return Boolean.TRUE;
+        return new ActionStatus( true );
     }
 
     @Override
-    public Boolean deleteMetadata( String groupId, String artifactId, String version, String key, String repositoryId )
+    public ActionStatus deleteMetadata( String groupId, String artifactId, String version, String key, String repositoryId )
         throws ArchivaRestServiceException
     {
         ProjectVersionMetadata projectVersionMetadata =
@@ -681,7 +684,7 @@ public class DefaultBrowseService
 
         if ( projectVersionMetadata == null )
         {
-            return Boolean.FALSE;
+            return new ActionStatus( false );
         }
 
         GenericMetadataFacet metadataFacet =
@@ -695,7 +698,7 @@ public class DefaultBrowseService
         }
         else
         {
-            return Boolean.TRUE;
+            return new ActionStatus( true );
         }
 
         RepositorySession repositorySession = null;
@@ -726,7 +729,7 @@ public class DefaultBrowseService
         {
             repositorySession.close();
         }
-        return Boolean.TRUE;
+        return new ActionStatus( true );
     }
 
     @Override
@@ -743,10 +746,12 @@ public class DefaultBrowseService
 
                 ManagedRepositoryContent managedRepositoryContent =
                     getManagedRepositoryContent( repoId );
-                ArchivaArtifact archivaArtifact = new ArchivaArtifact( groupId, artifactId, version, classifier,
-                                                                       StringUtils.isEmpty( type ) ? "jar" : type,
-                                                                       repoId );
-                StorageAsset file = managedRepositoryContent.toFile( archivaArtifact );
+                ArchivaItemSelector itemSelector = ArchivaItemSelector.builder( ).withNamespace( groupId )
+                    .withProjectId( artifactId ).withVersion( version ).withClassifier( classifier )
+                    .withType( StringUtils.isEmpty( type ) ? "jar" : type )
+                    .withArtifactId( artifactId ).build();
+                org.apache.archiva.repository.content.Artifact archivaArtifact = managedRepositoryContent.getItem( itemSelector ).adapt( org.apache.archiva.repository.content.Artifact.class );
+                StorageAsset file = archivaArtifact.getAsset();
                 if ( file.exists() )
                 {
                     return readFileEntries( file, path, repoId );
@@ -832,10 +837,12 @@ public class DefaultBrowseService
                     log.error("No repository content found for "+repoId);
                     continue;
                 }
-                ArchivaArtifact archivaArtifact = new ArchivaArtifact( groupId, artifactId, version, classifier,
-                                                                       StringUtils.isEmpty( type ) ? "jar" : type,
-                                                                       repoId );
-                StorageAsset file = managedRepositoryContent.toFile( archivaArtifact );
+                ArchivaItemSelector itemSelector = ArchivaItemSelector.builder( ).withNamespace( groupId )
+                    .withProjectId( artifactId ).withVersion( version ).withClassifier( classifier )
+                    .withType( StringUtils.isEmpty( type ) ? "jar" : type )
+                    .withArtifactId( artifactId ).build();
+                org.apache.archiva.repository.content.Artifact archivaArtifact = managedRepositoryContent.getItem( itemSelector ).adapt( org.apache.archiva.repository.content.Artifact.class );
+                StorageAsset file = archivaArtifact.getAsset( );
                 if ( !file.exists() )
                 {
                     log.debug( "file: {} not exists for repository: {} try next repository", file, repoId );
@@ -844,7 +851,7 @@ public class DefaultBrowseService
                 if ( StringUtils.isNotBlank( path ) )
                 {
                     // zip entry of the path -> path must a real file entry of the archive
-                    StorageUtil.PathInformation pathInfo = StorageUtil.getAssetDataAsPath(file);
+                    FsStorageUtil.PathInformation pathInfo = FsStorageUtil.getAssetDataAsPath(file);
                     JarFile jarFile = new JarFile( pathInfo.getPath().toFile());
                     ZipEntry zipEntry = jarFile.getEntry( path );
                     try (InputStream inputStream = jarFile.getInputStream( zipEntry ))
@@ -876,8 +883,8 @@ public class DefaultBrowseService
     }
 
     @Override
-    public Boolean artifactAvailable( String groupId, String artifactId, String version, String classifier,
-                                      String repositoryId )
+    public AvailabilityStatus artifactAvailable( String groupId, String artifactId, String version, String classifier,
+                                                 String repositoryId )
         throws ArchivaRestServiceException
     {
         List<String> selectedRepos = getSelectedRepos( repositoryId );
@@ -902,15 +909,18 @@ public class DefaultBrowseService
                 ManagedRepositoryContent managedRepositoryContent = getManagedRepositoryContent( repoId );
 
                 // FIXME default to jar which can be wrong for war zip etc....
-                ArchivaArtifact archivaArtifact = new ArchivaArtifact( groupId, artifactId, version,
-                                                                       StringUtils.isEmpty( classifier )
-                                                                           ? ""
-                                                                           : classifier, "jar", repoId );
-                StorageAsset file = managedRepositoryContent.toFile( archivaArtifact );
+                ArchivaItemSelector itemSelector = ArchivaItemSelector.builder( ).withNamespace( groupId )
+                    .withProjectId( artifactId ).withVersion( version ).withClassifier( StringUtils.isEmpty( classifier )
+                        ? ""
+                        : classifier )
+                    .withType( "jar" )
+                    .withArtifactId( artifactId ).build();
+                org.apache.archiva.repository.content.Artifact archivaArtifact = managedRepositoryContent.getItem( itemSelector ).adapt( org.apache.archiva.repository.content.Artifact.class );
+                StorageAsset file = archivaArtifact.getAsset( );
 
                 if ( file != null && file.exists() )
                 {
-                    return true;
+                    return new AvailabilityStatus( true );
                 }
 
                 // in case of SNAPSHOT we can have timestamped version locally !
@@ -919,30 +929,24 @@ public class DefaultBrowseService
                     StorageAsset metadataFile = file.getStorage().getAsset(file.getParent().getPath()+"/"+MetadataTools.MAVEN_METADATA );
                     if ( metadataFile.exists() )
                     {
-                        try
-                        {
-                            ArchivaRepositoryMetadata archivaRepositoryMetadata =
-                                MavenMetadataReader.read( metadataFile );
-                            int buildNumber = archivaRepositoryMetadata.getSnapshotVersion().getBuildNumber();
-                            String timeStamp = archivaRepositoryMetadata.getSnapshotVersion().getTimestamp();
-                            // rebuild file name with timestamped version and build number
-                            String timeStampFileName = new StringBuilder( artifactId ).append( '-' ) //
-                                .append( StringUtils.remove( version, "-" + VersionUtil.SNAPSHOT ) ) //
-                                .append( '-' ).append( timeStamp ) //
-                                .append( '-' ).append( Integer.toString( buildNumber ) ) //
-                                .append( ( StringUtils.isEmpty( classifier ) ? "" : "-" + classifier ) ) //
-                                .append( ".jar" ).toString();
+                        MetadataReader metadataReader = repositoryRegistry.getMetadataReader( managedRepositoryContent.getRepository( ).getType( ) );
+                        ArchivaRepositoryMetadata archivaRepositoryMetadata =
+                            metadataReader.read( metadataFile );
+                        int buildNumber = archivaRepositoryMetadata.getSnapshotVersion().getBuildNumber();
+                        String timeStamp = archivaRepositoryMetadata.getSnapshotVersion().getTimestamp();
+                        // rebuild file name with timestamped version and build number
+                        String timeStampFileName = new StringBuilder( artifactId ).append( '-' ) //
+                            .append( StringUtils.remove( version, "-" + VersionUtil.SNAPSHOT ) ) //
+                            .append( '-' ).append( timeStamp ) //
+                            .append( '-' ).append( Integer.toString( buildNumber ) ) //
+                            .append( ( StringUtils.isEmpty( classifier ) ? "" : "-" + classifier ) ) //
+                            .append( ".jar" ).toString();
 
-                            StorageAsset timeStampFile = file.getStorage().getAsset(file.getParent().getPath() + "/" + timeStampFileName );
-                            log.debug( "try to find timestamped snapshot version file: {}", timeStampFile.getPath() );
-                            if ( timeStampFile.exists() )
-                            {
-                                return true;
-                            }
-                        }
-                        catch (XMLException | IOException e )
+                        StorageAsset timeStampFile = file.getStorage().getAsset(file.getParent().getPath() + "/" + timeStampFileName );
+                        log.debug( "try to find timestamped snapshot version file: {}", timeStampFile.getPath() );
+                        if ( timeStampFile.exists() )
                         {
-                            log.warn( "skip fail to find timestamped snapshot file: {}", e.getMessage() );
+                            return new AvailabilityStatus( true );
                         }
                     }
                 }
@@ -956,7 +960,7 @@ public class DefaultBrowseService
                     // download pom now
                     String pomPath = StringUtils.substringBeforeLast( path, ".jar" ) + ".pom";
                     proxyHandler.fetchFromProxies( managedRepositoryContent.getRepository(), pomPath );
-                    return true;
+                    return new AvailabilityStatus( true );
                 }
             }
         } catch ( RepositoryException e )
@@ -966,11 +970,11 @@ public class DefaultBrowseService
                                                    Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), e );
         }
 
-        return false;
+        return new AvailabilityStatus( false );
     }
 
     @Override
-    public Boolean artifactAvailable( String groupId, String artifactId, String version, String repositoryId )
+    public AvailabilityStatus artifactAvailable( String groupId, String artifactId, String version, String repositoryId )
         throws ArchivaRestServiceException
     {
         return artifactAvailable( groupId, artifactId, version, null, repositoryId );
@@ -1089,16 +1093,16 @@ public class DefaultBrowseService
     }
 
     @Override
-    public Boolean importMetadata( MetadataAddRequest metadataAddRequest, String repositoryId )
+    public ActionStatus importMetadata( MetadataAddRequest metadataAddRequest, String repositoryId )
         throws ArchivaRestServiceException
     {
-        boolean result = true;
+        ActionStatus result = new ActionStatus( true );
         for ( Map.Entry<String, String> metadata : metadataAddRequest.getMetadatas().entrySet() )
         {
             result = addMetadata( metadataAddRequest.getGroupId(), metadataAddRequest.getArtifactId(),
                                   metadataAddRequest.getVersion(), metadata.getKey(), metadata.getValue(),
                                   repositoryId );
-            if ( !result )
+            if ( !result.isSuccess() )
             {
                 break;
             }
@@ -1181,7 +1185,7 @@ public class DefaultBrowseService
             filterDepth++;
         }
 
-        StorageUtil.PathInformation pathInfo = StorageUtil.getAssetDataAsPath(file);
+        FsStorageUtil.PathInformation pathInfo = FsStorageUtil.getAssetDataAsPath(file);
         JarFile jarFile = new JarFile(pathInfo.getPath().toFile());
         try
         {

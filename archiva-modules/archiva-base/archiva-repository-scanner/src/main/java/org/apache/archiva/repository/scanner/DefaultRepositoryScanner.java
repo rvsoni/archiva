@@ -19,8 +19,8 @@ package org.apache.archiva.repository.scanner;
  * under the License.
  */
 
-import org.apache.archiva.admin.model.RepositoryAdminException;
 import org.apache.archiva.configuration.FileTypes;
+import org.apache.archiva.consumers.ConsumerException;
 import org.apache.archiva.consumers.InvalidRepositoryContentConsumer;
 import org.apache.archiva.consumers.KnownRepositoryContentConsumer;
 import org.apache.archiva.consumers.RepositoryContentConsumer;
@@ -70,10 +70,11 @@ public class DefaultRepositoryScanner
 
             return scan( repository, knownContentConsumers, invalidContentConsumers, ignoredPatterns, changesSince );
         }
-        catch ( RepositoryAdminException e )
+        catch ( ConsumerException e )
         {
-            throw new RepositoryScannerException( e.getMessage(), e );
-        } finally
+            throw new RepositoryScannerException( e.getMessage( ), e );
+        }
+        finally
         {
             repositoryContentConsumers.releaseSelectedKnownConsumers( knownContentConsumers );
         }
@@ -91,7 +92,7 @@ public class DefaultRepositoryScanner
             throw new IllegalArgumentException( "Unable to operate on a null repository." );
         }
 
-        StorageAsset repositoryBase = repository.getAsset("");
+        StorageAsset repositoryBase = repository.getRoot();
 
         //MRM-1342 Repository statistics report doesn't appear to be working correctly
         //create the repo if not existing to have an empty stats
